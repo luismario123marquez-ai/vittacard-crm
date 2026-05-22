@@ -108,7 +108,7 @@ export default function Login() {
           cc: cc.trim(),
           telefono: telefono.trim(),
           correo: correo.trim(),
-          planId: "essential",
+          planId: "free",
           cuenta: generatedCuenta,
           activo: true,
           saldo: 150000,

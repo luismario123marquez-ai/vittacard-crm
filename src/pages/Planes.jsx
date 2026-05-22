@@ -30,21 +30,22 @@ export default function Planes() {
   };
 
   const colors = {
-    essential: { bg: "#E0F7F7", accent: "#00B4B4", dark: "#008A8A" },
-    lifestyle: { bg: "#EDE9FE", accent: "#7C3AED", dark: "#6D28D9" },
-    platinum: { bg: "#E5E7EB", accent: "#1A2B3C", dark: "#111827" },
+    free: { bg: "#F1F5F9", accent: "#64748B", dark: "#475569" },
+    basico: { bg: "#EFF6FF", accent: "#3B82F6", dark: "#1D4ED8" },
+    plus: { bg: "#F0FDFA", accent: "#14B8A6", dark: "#0F766E" },
+    premium: { bg: "#F3E8FF", accent: "#7C3AED", dark: "#6B21A8" },
   };
 
   return (
     <div>
       <div style={{ marginBottom: "28px" }}>
         <h1 style={{ fontFamily: "Syne", fontSize: "28px", fontWeight: 800 }}>Planes</h1>
-        <p style={{ color: "#6B7280", marginTop: "4px" }}>Administra los planes Essential, LifeStyle y Platinum</p>
+        <p style={{ color: "#6B7280", marginTop: "4px" }}>Administra los planes Free, Básico, Plus y Premium</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px" }}>
         {planes.map(plan => {
-          const c = colors[plan.id] || colors.essential;
+          const c = colors[plan.id] || colors.free;
           const count = usersInPlan(plan.id);
           return (
             <div key={plan.id} className="card" style={{ borderTop: `4px solid ${c.accent}`, position: "relative" }}>

@@ -5,7 +5,7 @@ import { collection, getDocs, query, where, doc, updateDoc, addDoc, getDoc, dele
 import { useNavigate } from "react-router-dom";
 import { updatePassword } from "firebase/auth";
 import MapaAliados from "../../components/MapaAliados";
-import { Store, Activity, Dumbbell, ShoppingCart, Utensils, Pill, MapPin, Phone } from "lucide-react";
+import { Store, Activity, Dumbbell, ShoppingCart, Utensils, Pill, MapPin, Phone, CheckCircle } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 
 export default function UsuarioDashboard() {
@@ -170,6 +170,76 @@ export default function UsuarioDashboard() {
     return [...remainingAllies, ...addedAllies];
   };
 
+  const getPlanBadge = (planId) => {
+    const pid = (planId || "free").toLowerCase();
+    let style = {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "4px 10px",
+      borderRadius: "20px",
+      fontSize: "11px",
+      fontWeight: "700",
+      letterSpacing: "0.05em",
+      textTransform: "uppercase",
+      verticalAlign: "middle"
+    };
+    let text = "";
+
+    switch (pid) {
+      case "free":
+        style = {
+          ...style,
+          background: "#475569",
+          color: "#E2E8F0",
+          border: "1px solid #64748B",
+        };
+        text = "Free";
+        break;
+      case "basico":
+        style = {
+          ...style,
+          background: "rgba(59, 130, 246, 0.15)",
+          color: "#60A5FA",
+          border: "1px solid rgba(59, 130, 246, 0.4)",
+        };
+        text = "Básico";
+        break;
+      case "plus":
+        style = {
+          ...style,
+          background: "rgba(20, 184, 166, 0.15)",
+          color: "#2DD4BF",
+          border: "1px solid rgba(20, 184, 166, 0.4)",
+        };
+        text = "Plus";
+        break;
+      case "premium":
+        style = {
+          ...style,
+          background: "linear-gradient(135deg, #7C3AED 0%, #D97706 100%)",
+          color: "#FFFFFF",
+          border: "1px solid #F59E0B",
+          boxShadow: "0 0 10px rgba(124, 58, 237, 0.6), inset 0 0 4px rgba(255, 255, 255, 0.4)",
+          textShadow: "0 1px 2px rgba(0, 0, 0, 0.3)"
+        };
+        text = "Premium";
+        break;
+      default:
+        style = {
+          ...style,
+          background: "#475569",
+          color: "#E2E8F0",
+        };
+        text = planId ? planId.charAt(0).toUpperCase() + planId.slice(1) : "Free";
+    }
+
+    return (
+      <span style={style}>
+        {text}
+      </span>
+    );
+  };
+
   const loadData = async () => {
     try {
       // 1. Cargar Perfil de Usuario
@@ -181,7 +251,7 @@ export default function UsuarioDashboard() {
         userDoc = { 
           nombres: currentUser.email, 
           correo: currentUser.email, 
-          planId: "essential", 
+          planId: "free", 
           cuenta: "5200-9999-8888-7777", 
           activo: true,
           saldo: 150000
@@ -288,8 +358,8 @@ export default function UsuarioDashboard() {
   }, [modalEscanearQR, confirmingPayment, procesandoPagoQR]);
 
   const calcularMontoFinal = (montoOriginal, planId, sector) => {
-    const descText = obtenerDescuento(planId, sector);
-    const descPct = parseInt(descText.replace("%", ""), 10) || 5;
+    const descText = obtenerDescuento(planId);
+    const descPct = parseInt(descText.replace("%", ""), 10) || 0;
     const descuento = (montoOriginal * descPct) / 100;
     return {
       descuento,
@@ -551,7 +621,7 @@ export default function UsuarioDashboard() {
     }
   };
 
-  // Comprar / Cambiar de plan (Auditoría estricta de saldo Fase 3)
+  // Comprar / Cambiar de plan (Auditoría estricta de saldo Fase 3 - Transacción Atómica)
   const handleAdquirirPlan = async (plan) => {
     if (perfil.planId === plan.id) return;
     setErrorTransaccion("");
@@ -564,40 +634,39 @@ export default function UsuarioDashboard() {
         return;
       }
 
-      // Lectura en tiempo real del saldo desde Firestore para auditoría
       const userRef = doc(db, "usuarios", perfilId);
-      const snap = await getDoc(userRef);
-      if (!snap.exists()) {
-        setErrorTransaccion("Error: El usuario no existe en la base de datos.");
-        setTimeout(() => setErrorTransaccion(""), 4000);
-        return;
-      }
       
-      const realSaldo = snap.data().saldo ?? 0;
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("El usuario no existe en la base de datos.");
+        }
+        
+        const realSaldo = userSnap.data().saldo ?? 0;
 
-      // Validación matemática del saldo en tiempo real
-      if (realSaldo < plan.cuota) {
-        setErrorTransaccion("Saldo insuficiente para adquirir este plan.");
-        setTimeout(() => setErrorTransaccion(""), 4000);
-        return;
-      }
+        // Validación matemática del saldo en tiempo real
+        if (realSaldo < plan.cuota) {
+          throw new Error("Saldo insuficiente para adquirir este plan.");
+        }
 
-      const nuevoSaldo = realSaldo - plan.cuota;
+        const nuevoSaldo = realSaldo - plan.cuota;
 
-      // Actualizar saldo y plan
-      await updateDoc(userRef, {
-        saldo: nuevoSaldo,
-        planId: plan.id
-      });
+        // Actualizar saldo y plan
+        transaction.update(userRef, {
+          saldo: nuevoSaldo,
+          planId: plan.id
+        });
 
-      // Registrar la transacción
-      await addDoc(collection(db, "transacciones"), {
-        usuarioNombre: perfil.nombres,
-        comercio: "Suscripción VittaCard " + plan.nombre,
-        monto: plan.cuota,
-        categoria: "Servicios",
-        fecha: new Date(),
-        estado: "completada"
+        // Registrar la transacción
+        const transaccionRef = doc(collection(db, "transacciones"));
+        transaction.set(transaccionRef, {
+          usuarioNombre: perfil.nombres,
+          comercio: "Suscripción VittaCard " + plan.nombre,
+          monto: plan.cuota,
+          categoria: "Servicios",
+          fecha: new Date(),
+          estado: "completada"
+        });
       });
 
       setMensajeExito(`¡Has adquirido el plan VittaCard ${plan.nombre} exitosamente!`);
@@ -605,7 +674,7 @@ export default function UsuarioDashboard() {
       await loadData();
     } catch (err) {
       console.error("Error al adquirir plan:", err);
-      setErrorTransaccion("Ocurrió un error al procesar el cambio de plan.");
+      setErrorTransaccion(err.message || "Ocurrió un error al procesar el cambio de plan.");
       setTimeout(() => setErrorTransaccion(""), 4000);
     }
   };
@@ -623,16 +692,17 @@ export default function UsuarioDashboard() {
     }
   };
 
-  const obtenerDescuento = (planId, sector) => {
-    const plan = (planId || "essential").toLowerCase();
-    const sec = (sector || "Otro").toLowerCase();
-    if (plan === "platinum") {
-      return sec === "salud" ? "20%" : "15%";
-    } else if (plan === "lifestyle") {
-      return (sec === "salud" || sec === "deporte") ? "10%" : "8%";
-    } else {
-      return "5%";
+  const obtenerDescuento = (planId) => {
+    const plan = (planId || "free").toLowerCase();
+    const planObj = planes.find(p => p.id.toLowerCase() === plan);
+    if (planObj && planObj.descuento !== undefined) {
+      return `${Math.round(planObj.descuento * 100)}%`;
     }
+    // Fallbacks si la base de datos aún no cargó
+    if (plan === "premium") return "15%";
+    if (plan === "plus") return "10%";
+    if (plan === "basico") return "5%";
+    return "0%";
   };
 
   const handleGuardarAjustes = async (e) => {
@@ -695,9 +765,10 @@ export default function UsuarioDashboard() {
 
   // Paleta de colores para planes
   const planColors = {
-    essential: { bg: "#E0F7F7", accent: "#00B4B4", dark: "#008A8A" },
-    lifestyle: { bg: "#EDE9FE", accent: "#7C3AED", dark: "#6D28D9" },
-    platinum: { bg: "#E5E7EB", accent: "#1A2B3C", dark: "#111827" },
+    free: { bg: "#475569", accent: "#64748B", dark: "#334155" },
+    basico: { bg: "rgba(59, 130, 246, 0.15)", accent: "#3B82F6", dark: "#1D4ED8" },
+    plus: { bg: "rgba(20, 184, 166, 0.15)", accent: "#14B8A6", dark: "#0F766E" },
+    premium: { bg: "linear-gradient(135deg, #7C3AED 0%, #D97706 100%)", accent: "#7C3AED", dark: "#5B21B6" }
   };
 
   // Formatear Fecha
@@ -743,7 +814,10 @@ export default function UsuarioDashboard() {
           >
             {theme === "dark" ? "☀️ Claro" : "🌙 Oscuro"}
           </button>
-          <span style={{ color: '#94A3B8', fontSize: '13px' }}>{perfil?.correo}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#94A3B8', fontSize: '13px' }}>{perfil?.correo}</span>
+            {getPlanBadge(perfil?.planId)}
+          </div>
           <button 
             onClick={handleLogout} 
             style={{ 
@@ -806,7 +880,9 @@ export default function UsuarioDashboard() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                   <div>
                     {/* Saludo con nombre real */}
-                    <h1 style={{ margin: 0, fontFamily: 'Syne', fontSize: '28px', fontWeight: 800 }}>Hola, {perfil?.nombres}</h1>
+                    <h1 style={{ margin: 0, fontFamily: 'Syne', fontSize: '28px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      Hola, {perfil?.nombres} {getPlanBadge(perfil?.planId)}
+                    </h1>
                     <p style={{ color: themeStyles.textMuted, marginTop: '4px' }}>Bienvenido al portal de usuarios VittaCard.</p>
                   </div>
                   {/* Tarjeta de Cuenta */}
@@ -977,37 +1053,90 @@ export default function UsuarioDashboard() {
 
                 {/* Lista de todos los planes */}
                 <h3 style={{ fontFamily: 'Syne', fontSize: '20px', marginBottom: '16px' }}>Planes Disponibles</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px" }}>
                   {planes.map(plan => {
-                    const c = planColors[plan.id] || planColors.essential;
+                    const c = planColors[plan.id] || planColors.free;
                     const esPlanActivo = perfil?.planId === plan.id;
+                    const isPremium = plan.id === "premium";
+
+                    const cardStyle = isPremium
+                      ? {
+                          background: "linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)",
+                          color: "white",
+                          border: "1px solid rgba(124, 58, 237, 0.4)",
+                          boxShadow: "0 10px 25px -5px rgba(124, 58, 237, 0.5), 0 8px 10px -6px rgba(124, 58, 237, 0.5)",
+                          position: "relative",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          minHeight: "340px",
+                          borderRadius: "16px",
+                          padding: "24px"
+                        }
+                      : {
+                          background: "rgba(15, 23, 42, 0.5)",
+                          backdropFilter: "blur(12px)",
+                          WebkitBackdropFilter: "blur(12px)",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          color: "#F8FAFC",
+                          position: "relative",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          minHeight: "340px",
+                          borderRadius: "16px",
+                          padding: "24px"
+                        };
+
                     return (
-                      <div key={plan.id} className="card" style={{ borderTop: `4px solid ${c.accent}`, position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "320px" }}>
+                      <div key={plan.id} style={cardStyle}>
+                        {isPremium && (
+                          <div style={{
+                            position: "absolute",
+                            top: "-12px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            background: "#F59E0B",
+                            color: "#0F172A",
+                            fontSize: "10px",
+                            fontWeight: "800",
+                            padding: "4px 12px",
+                            borderRadius: "20px",
+                            boxShadow: "0 4px 10px rgba(245, 158, 11, 0.4)",
+                            letterSpacing: "0.05em",
+                            textTransform: "uppercase",
+                            zIndex: 10
+                          }}>
+                            ⭐ RECOMENDADO
+                          </div>
+                        )}
                         <div>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
                             <div>
                               <div style={{
-                                display: "inline-block", background: c.bg, color: c.accent,
+                                display: "inline-block",
+                                background: isPremium ? "rgba(255, 255, 255, 0.2)" : c.bg,
+                                color: isPremium ? "#FFFFFF" : c.accent,
                                 padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700, marginBottom: "8px"
                               }}>
                                 {plan.subtitulo}
                               </div>
-                              <h2 style={{ fontFamily: "Syne", fontSize: "22px", fontWeight: 800, color: c.accent }}>{plan.nombre}</h2>
+                              <h2 style={{ fontFamily: "Syne", fontSize: "22px", fontWeight: 800, color: isPremium ? "#FFFFFF" : c.accent, margin: "4px 0" }}>{plan.nombre}</h2>
                             </div>
                             <div style={{ textAlign: "right" }}>
-                              <div style={{ fontFamily: "Syne", fontSize: "20px", fontWeight: 800, color: themeStyles.text }}>
+                              <div style={{ fontFamily: "Syne", fontSize: "20px", fontWeight: 800, color: isPremium ? "#FFFFFF" : "#F8FAFC" }}>
                                 ${plan.cuota?.toLocaleString()}
                               </div>
-                              <div style={{ fontSize: "11px", color: themeStyles.textMuted }}>/mes</div>
+                              <div style={{ fontSize: "11px", color: isPremium ? "#E2E8F0" : "#94A3B8" }}>/mes</div>
                             </div>
                           </div>
 
                           {/* Beneficios */}
-                          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "8px", padding: 0, marginBottom: "20px" }}>
+                          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", padding: 0, marginBottom: "20px" }}>
                             {(plan.beneficios || []).map((b, i) => (
-                              <li key={i} style={{ display: "flex", gap: "8px", fontSize: "12px", color: themeStyles.text }}>
-                                <span style={{ color: c.accent, flexShrink: 0 }}>✓</span>
-                                {b}
+                              <li key={i} style={{ display: "flex", gap: "8px", fontSize: "12.5px", color: isPremium ? "#F1F5F9" : "#E2E8F0", alignItems: "flex-start" }}>
+                                <CheckCircle size={16} color={isPremium ? "#F59E0B" : c.accent} style={{ flexShrink: 0, marginTop: "2px" }} />
+                                <span>{b}</span>
                               </li>
                             ))}
                           </ul>
@@ -1021,25 +1150,41 @@ export default function UsuarioDashboard() {
                             style={{
                               width: "100%",
                               padding: "10px",
-                              border: esPlanActivo ? "2px solid #10B981" : `2px solid ${c.accent}`,
+                              border: esPlanActivo 
+                                ? "2px solid #10B981" 
+                                : (isPremium ? "2px solid #F59E0B" : `2px solid ${c.accent}`),
                               borderRadius: "10px",
-                              background: esPlanActivo ? "#10B981" : "transparent",
-                              color: esPlanActivo ? "white" : c.accent,
+                              background: esPlanActivo 
+                                ? "#10B981" 
+                                : (isPremium ? "#F59E0B" : "transparent"),
+                              color: esPlanActivo 
+                                ? "white" 
+                                : (isPremium ? "#0F172A" : c.accent),
                               cursor: esPlanActivo ? "not-allowed" : "pointer",
-                              fontWeight: 600,
+                              fontWeight: 700,
                               fontSize: "13px",
                               transition: "all 0.15s"
                             }}
                             onMouseEnter={e => {
                               if (!esPlanActivo) {
-                                e.target.style.background = c.accent;
-                                e.target.style.color = "white";
+                                if (isPremium) {
+                                  e.target.style.background = "transparent";
+                                  e.target.style.color = "#F59E0B";
+                                } else {
+                                  e.target.style.background = c.accent;
+                                  e.target.style.color = "white";
+                                }
                               }
                             }}
                             onMouseLeave={e => {
                               if (!esPlanActivo) {
-                                e.target.style.background = "transparent";
-                                e.target.style.color = c.accent;
+                                if (isPremium) {
+                                  e.target.style.background = "#F59E0B";
+                                  e.target.style.color = "#0F172A";
+                                } else {
+                                  e.target.style.background = "transparent";
+                                  e.target.style.color = c.accent;
+                                }
                               }
                             }}
                           >

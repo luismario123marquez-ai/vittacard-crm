@@ -8,7 +8,7 @@ export default function Usuarios() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ nombres: "", correo: "", cuenta: "", planId: "essential", activo: true });
+  const [form, setForm] = useState({ nombres: "", correo: "", cuenta: "", planId: "free", activo: true });
 
   const load = async () => {
     const [uSnap, pSnap] = await Promise.all([
@@ -28,14 +28,14 @@ export default function Usuarios() {
     } else {
       await addDoc(collection(db, "usuarios"), { ...form, creadoEn: new Date() });
     }
-    setForm({ nombres: "", correo: "", cuenta: "", planId: "essential", activo: true });
+    setForm({ nombres: "", correo: "", cuenta: "", planId: "free", activo: true });
     setEditId(null);
     setShowForm(false);
     load();
   };
 
   const handleEdit = (u) => {
-    setForm({ nombres: u.nombres, correo: u.correo, cuenta: u.cuenta || "", planId: u.planId || "essential", activo: u.activo });
+    setForm({ nombres: u.nombres, correo: u.correo, cuenta: u.cuenta || "", planId: u.planId || "free", activo: u.activo });
     setEditId(u.id);
     setShowForm(true);
   };
@@ -48,7 +48,7 @@ export default function Usuarios() {
   };
 
   const planLabel = (id) => planes.find(p => p.id === id)?.nombre || id;
-  const planColor = { essential: "#00B4B4", lifestyle: "#7C3AED", platinum: "#1A2B3C" };
+  const planColor = { free: "#64748B", basico: "#3B82F6", plus: "#14B8A6", premium: "#7C3AED" };
 
   const filtered = usuarios.filter(u =>
     u.nombres?.toLowerCase().includes(search.toLowerCase()) ||
@@ -63,7 +63,7 @@ export default function Usuarios() {
           <p style={{ color: "#6B7280", marginTop: "4px" }}>Gestión de usuarios registrados en VittaCard</p>
         </div>
         <button
-          onClick={() => { setShowForm(true); setEditId(null); setForm({ nombres: "", correo: "", cuenta: "", planId: "essential", activo: true }); }}
+          onClick={() => { setShowForm(true); setEditId(null); setForm({ nombres: "", correo: "", cuenta: "", planId: "free", activo: true }); }}
           style={{ background: "#00B4B4", color: "white", border: "none", borderRadius: "10px", padding: "10px 20px", cursor: "pointer", fontWeight: 600 }}
         >
           + Nuevo Usuario
@@ -107,9 +107,10 @@ export default function Usuarios() {
               <div>
                 <label style={{ fontSize: "13px", fontWeight: 600, display: "block", marginBottom: "5px" }}>Plan</label>
                 <select className="input-field" value={form.planId} onChange={e => setForm({ ...form, planId: e.target.value })}>
-                  <option value="essential">Essential</option>
-                  <option value="lifestyle">LifeStyle</option>
-                  <option value="platinum">Platinum</option>
+                  <option value="free">Free</option>
+                  <option value="basico">Básico</option>
+                  <option value="plus">Plus</option>
+                  <option value="premium">Premium</option>
                 </select>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

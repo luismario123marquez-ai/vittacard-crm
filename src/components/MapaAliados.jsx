@@ -253,12 +253,13 @@ function MapController({ selectedAliado }) {
   );
 }
 
-function MapaAliadosInner({ rol, userPlan = "essential", currentAlly = null }) {
+function MapaAliadosInner({ rol, userPlan = "free", currentAlly = null }) {
   const { theme } = useAuth();
   const navigate = useNavigate();
   const isDark = theme === "dark";
 
   const [aliados, setAliados] = useState([]);
+  const [planes, setPlanes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAliado, setSelectedAliado] = useState(null);
   
@@ -266,33 +267,37 @@ function MapaAliadosInner({ rol, userPlan = "essential", currentAlly = null }) {
   const [selectedSector, setSelectedSector] = useState("Todos");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Cargar Aliados
+  // Cargar Aliados y Planes
   useEffect(() => {
-    const fetchAliados = async () => {
+    const fetchData = async () => {
       try {
-        const snap = await getDocs(collection(db, "aliados"));
-        const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setAliados(lista);
+        const [alliesSnap, planesSnap] = await Promise.all([
+          getDocs(collection(db, "aliados")),
+          getDocs(collection(db, "planes"))
+        ]);
+        setAliados(alliesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setPlanes(planesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
-        console.error("Error cargando aliados para el mapa:", err);
+        console.error("Error cargando aliados y planes para el mapa:", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchAliados();
+    fetchData();
   }, []);
 
   // Calcular descuento dinámico según el plan del usuario
   const calcularDescuento = (sector) => {
-    const plan = (userPlan || "essential").toLowerCase();
-    const sec = (sector || "Otro").toLowerCase();
-    if (plan === "platinum") {
-      return sec === "salud" ? "20%" : "15%";
-    } else if (plan === "lifestyle") {
-      return (sec === "salud" || sec === "deporte") ? "10%" : "8%";
-    } else {
-      return "5%";
+    const plan = (userPlan || "free").toLowerCase();
+    const planObj = planes.find(p => p.id.toLowerCase() === plan);
+    if (planObj && planObj.descuento !== undefined) {
+      return `${Math.round(planObj.descuento * 100)}%`;
     }
+    // Fallbacks si aún no cargan los planes de Firestore
+    if (plan === "premium") return "15%";
+    if (plan === "plus") return "10%";
+    if (plan === "basico") return "5%";
+    return "0%";
   };
 
   // Crear pin personalizado
@@ -854,7 +859,7 @@ function MapaAliadosInner({ rol, userPlan = "essential", currentAlly = null }) {
                                   ✨ ¡Tu ubicación oficial!
                                 </div>
                               ) : (
-                                <div>Descuentos otorgados: <strong>5% / 8% / 15%</strong></div>
+                                <div>Descuentos otorgados: <strong>Free (0%) / Básico (5%) / Plus (10%) / Premium (15%)</strong></div>
                               )}
                             </div>
                           )}

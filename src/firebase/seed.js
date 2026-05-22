@@ -5,52 +5,85 @@
 // ============================================
 
 import { db } from "./config";
-import { collection, addDoc, setDoc, doc } from "firebase/firestore";
+import { collection, addDoc, setDoc, doc, deleteDoc } from "firebase/firestore";
 
 export const seedDatabase = async () => {
   try {
     console.log("Iniciando carga de datos...");
 
+    // Eliminar planes antiguos para evitar colisiones
+    const antiguosPlanes = ["essential", "lifestyle", "platinum"];
+    for (const idPlan of antiguosPlanes) {
+      try {
+        await deleteDoc(doc(db, "planes", idPlan));
+        console.log(`Plan antiguo eliminado: ${idPlan}`);
+      } catch (err) {
+        console.warn(`Error eliminando plan antiguo ${idPlan}:`, err);
+      }
+    }
+
     // PLANES
     const planes = [
       {
-        id: "essential",
-        nombre: "Essential",
+        id: "free",
+        nombre: "Free",
         subtitulo: "Básico",
-        cuota: 9999,
+        cuota: 0,
+        descuento: 0.0,
+        tarjeta: "Digital",
         beneficios: [
-          "5% de descuento en medicina y exámenes particulares",
-          "Cashback del 5% en ofertas seleccionadas",
-          "Registro de gastos",
-          "5% de descuento en productos de tiendas aliadas",
+          "Tarjeta Digital inmediata",
+          "Acceso básico al mapa de aliados",
+          "Soporte estándar por correo",
+          "Sin cuota mensual (Totalmente Gratis)",
         ],
-        color: "#00B4B4",
+        color: "#64748B",
       },
       {
-        id: "lifestyle",
-        nombre: "LifeStyle",
-        subtitulo: "Pro",
-        cuota: 25999,
+        id: "basico",
+        nombre: "Básico",
+        subtitulo: "Esencial",
+        cuota: 4900,
+        descuento: 0.05,
+        tarjeta: "Física Estándar",
         beneficios: [
-          "10% de descuento en medicina y exámenes particulares",
-          "CashBack del 10% en ofertas seleccionadas",
-          "Descuentos del 10% en mensualidades de marcas aliadas",
-          "10% de descuento en productos de tiendas aliadas",
+          "Descuento del 5% en todos los comercios",
+          "Tarjeta Física Estándar gratis",
+          "Acceso completo al mapa de aliados",
+          "Soporte prioritario por WhatsApp",
+        ],
+        color: "#3B82F6",
+      },
+      {
+        id: "plus",
+        nombre: "Plus",
+        subtitulo: "Avanzado",
+        cuota: 12900,
+        descuento: 0.10,
+        tarjeta: "Personalizada",
+        beneficios: [
+          "Descuento del 10% en todos los comercios",
+          "Tarjeta Física Personalizada",
+          "Prioridad en atención y soporte 24/7",
+          "Acceso a preventas y ofertas especiales",
+        ],
+        color: "#14B8A6",
+      },
+      {
+        id: "premium",
+        nombre: "Premium",
+        subtitulo: "Recomendado",
+        cuota: 24900,
+        descuento: 0.15,
+        tarjeta: "Metálica Black",
+        cashback: 0.01,
+        beneficios: [
+          "Descuento del 15% en todos los comercios",
+          "Tarjeta Metálica Black exclusiva",
+          "1% de Cashback acumulable en compras",
+          "Acceso a salas VIP y eventos exclusivos",
         ],
         color: "#7C3AED",
-      },
-      {
-        id: "platinum",
-        nombre: "Platinum",
-        subtitulo: "Premium",
-        cuota: 35999,
-        beneficios: [
-          "20% de descuento en medicina y exámenes particulares",
-          "CashBack del 20% en ofertas seleccionadas",
-          "Descuentos del 20% en mensualidades de marcas aliadas",
-          "15% de descuento en productos de tiendas aliadas",
-        ],
-        color: "#1A2B3C",
       },
     ];
 
@@ -75,9 +108,9 @@ export const seedDatabase = async () => {
 
     // USUARIOS DE PRUEBA
     const usuarios = [
-      { nombres: "Sarah Gómez", correo: "sarah@gmail.com", cuenta: "5200-4567-8901-2345", planId: "platinum", activo: true, creadoEn: new Date("2024-01-15") },
-      { nombres: "Carlos Pérez", correo: "carlos@gmail.com", cuenta: "5200-1111-2222-3333", planId: "lifestyle", activo: true, creadoEn: new Date("2024-02-20") },
-      { nombres: "María Torres", correo: "maria@gmail.com", cuenta: "5200-4444-5555-6666", planId: "essential", activo: true, creadoEn: new Date("2024-03-10") },
+      { nombres: "Sarah Gómez", correo: "sarah@gmail.com", cuenta: "5200-4567-8901-2345", planId: "premium", activo: true, creadoEn: new Date("2024-01-15") },
+      { nombres: "Carlos Pérez", correo: "carlos@gmail.com", cuenta: "5200-1111-2222-3333", planId: "plus", activo: true, creadoEn: new Date("2024-02-20") },
+      { nombres: "María Torres", correo: "maria@gmail.com", cuenta: "5200-4444-5555-6666", planId: "basico", activo: true, creadoEn: new Date("2024-03-10") },
     ];
 
     for (const usuario of usuarios) {

@@ -79,19 +79,17 @@ export default function Dashboard() {
             Resumen general del sistema VittaCard
           </p>
         </div>
-        {stats.usuarios === 0 && (
-          <button
-            onClick={handleSeed}
-            disabled={seeding}
-            style={{
-              background: "#00B4B4", color: "white", border: "none",
-              borderRadius: "10px", padding: "10px 20px",
-              cursor: "pointer", fontWeight: 600, fontSize: "13px"
-            }}
-          >
-            {seeding ? "Cargando datos..." : "🌱 Inicializar datos de prueba"}
-          </button>
-        )}
+        <button
+          onClick={handleSeed}
+          disabled={seeding}
+          style={{
+            background: "#00B4B4", color: "white", border: "none",
+            borderRadius: "10px", padding: "10px 20px",
+            cursor: "pointer", fontWeight: 600, fontSize: "13px"
+          }}
+        >
+          {seeding ? "Cargando datos..." : "🌱 Sincronizar Base de Datos (Seeding)"}
+        </button>
       </div>
 
       {/* Stat Cards */}

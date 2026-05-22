@@ -35,9 +35,10 @@ export default function VittaData() {
   const planMap = {};
   usuarios.forEach(u => { planMap[u.planId] = (planMap[u.planId] || 0) + 1; });
   const planData = [
-    { name: "Essential", value: planMap.essential || 0 },
-    { name: "LifeStyle", value: planMap.lifestyle || 0 },
-    { name: "Platinum", value: planMap.platinum || 0 },
+    { name: "Free", value: planMap.free || 0 },
+    { name: "Básico", value: planMap.basico || 0 },
+    { name: "Plus", value: planMap.plus || 0 },
+    { name: "Premium", value: planMap.premium || 0 },
   ];
 
   const catTopName = catData[0]?.name || "—";
