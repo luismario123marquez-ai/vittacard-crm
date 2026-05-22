@@ -1,6 +1,63 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { db } from "../firebase/config";
+import { collection, getDocs } from "firebase/firestore";
+
+const DEFAULT_PLANES = [
+  {
+    id: "free",
+    nombre: "Free",
+    subtitulo: "Básico",
+    cuota: 0,
+    beneficios: [
+      "Tarjeta Digital inmediata",
+      "Acceso básico al mapa de aliados",
+      "Soporte estándar por correo",
+      "Sin cuota mensual (Totalmente Gratis)",
+    ],
+    color: "#64748B",
+  },
+  {
+    id: "basico",
+    nombre: "Básico",
+    subtitulo: "Esencial",
+    cuota: 4900,
+    beneficios: [
+      "Descuento del 5% en comercios",
+      "Tarjeta Física Estándar gratis",
+      "Acceso completo al mapa de aliados",
+      "Soporte prioritario por WhatsApp",
+    ],
+    color: "#3B82F6",
+  },
+  {
+    id: "plus",
+    nombre: "Plus",
+    subtitulo: "Avanzado",
+    cuota: 12900,
+    beneficios: [
+      "Descuento del 10% en comercios",
+      "Tarjeta Física Personalizada",
+      "Prioridad y Soporte 24/7",
+      "Preventas y ofertas especiales",
+    ],
+    color: "#14B8A6",
+  },
+  {
+    id: "premium",
+    nombre: "Premium",
+    subtitulo: "Recomendado",
+    cuota: 24900,
+    beneficios: [
+      "Descuento del 15% en comercios",
+      "Tarjeta Metálica Black exclusiva",
+      "1% de Cashback acumulable",
+      "Salas VIP y eventos exclusivos",
+    ],
+    color: "#7C3AED",
+  },
+];
 
 const INTEGRANTES = [
   { nombre: "Juan Esteban Salamanca Vanegas",   rol: "Desarrollador · Ingeniería de Software" },
@@ -19,6 +76,27 @@ export default function LandingPage() {
   const [correo, setCorreo] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [enviado, setEnviado] = useState(false);
+  
+  // Estado para planes de Firestore
+  const [planes, setPlanes] = useState(DEFAULT_PLANES);
+
+  useEffect(() => {
+    const fetchPlanes = async () => {
+      try {
+        const pSnap = await getDocs(collection(db, "planes"));
+        if (!pSnap.empty) {
+          const planOrder = ["free", "basico", "plus", "premium"];
+          const dbPlanes = pSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => planOrder.indexOf(a.id) - planOrder.indexOf(b.id));
+          setPlanes(dbPlanes);
+        }
+      } catch (error) {
+        console.error("Error cargando planes de Firestore:", error);
+      }
+    };
+    fetchPlanes();
+  }, []);
 
   const modoOscuro = theme === "dark";
 
@@ -1075,222 +1153,138 @@ export default function LandingPage() {
           </div>
 
           <div className="grid-4-col" style={{ alignItems: "stretch" }}>
-            
-            {/* Plan Free */}
-            <div 
-              style={{ ...estiloCard, justifyContent: "space-between" }}
-              className="reveal hover-card"
-            >
-              <div>
-                <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: c.textoSub, marginBottom: "8px" }}>Básico</p>
-                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#64748B", marginBottom: "16px", fontFamily: "Syne" }}>Free</h3>
-                
-                <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
-                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$0</span>
-                  <span style={{ fontSize: "12px", color: c.textoSub, marginLeft: "4px" }}>/mes</span>
-                </div>
+            {planes.map((plan) => {
+              const esPremium = plan.id === "premium";
+              const esFree = plan.id === "free";
+              
+              // Estilos de tarjeta dinámicos
+              const cardStyles = esPremium 
+                ? {
+                    ...estiloCard,
+                    justifyContent: "space-between",
+                    background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 50%, #4338CA 100%)",
+                    border: "1px solid rgba(255, 255, 255, 0.25)",
+                    color: "#ffffff",
+                    position: "relative",
+                    transform: "scale(1.01)",
+                    boxShadow: "0 15px 40px rgba(124, 58, 237, 0.35)",
+                  }
+                : { ...estiloCard, justifyContent: "space-between" };
 
-                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#64748B", fontWeight: 800 }}>✓</span>
-                    <span>Tarjeta Digital inmediata</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#64748B", fontWeight: 800 }}>✓</span>
-                    <span>Acceso básico al mapa de aliados</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#64748B", fontWeight: 800 }}>✓</span>
-                    <span>Soporte estándar por correo</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#64748B", fontWeight: 800 }}>✓</span>
-                    <span>Sin cuota mensual (Totalmente Gratis)</span>
-                  </li>
-                </ul>
-              </div>
+              // Clases dinámicas
+              const cardClassName = esPremium ? "reveal hover-card-lifestyle" : "reveal hover-card";
 
-              <button
-                onClick={() => irALogin(true, "usuario")}
-                style={{
-                  ...s.btnPrimary,
-                  width: "100%",
-                  padding: "12px 20px",
+              // Estilos de botón dinámicos
+              let btnStyles = { ...s.btnPrimary, width: "100%", padding: "12px 20px" };
+              let btnClassName = "btn-hover";
+
+              if (esPremium) {
+                btnStyles = {
+                  ...btnStyles,
+                  background: "#ffffff",
+                  color: "#7C3AED",
+                  boxShadow: "0 10px 25px rgba(255,255,255,0.2)",
+                };
+                btnClassName = "btn-hover-white";
+              } else if (esFree) {
+                btnStyles = {
+                  ...btnStyles,
                   background: modoOscuro ? "rgba(255,255,255,0.08)" : "#64748B",
                   border: modoOscuro ? "1px solid rgba(255,255,255,0.15)" : "none",
                   color: "#ffffff",
                   boxShadow: "none",
-                }}
-                className="btn-hover-ghost"
-              >
-                Comenzar Gratis
-              </button>
-            </div>
+                };
+                btnClassName = "btn-hover-ghost";
+              } else {
+                btnStyles = {
+                  ...btnStyles,
+                  background: plan.color || "#00B4B4",
+                };
+              }
 
-            {/* Plan Básico */}
-            <div 
-              style={{ ...estiloCard, justifyContent: "space-between" }}
-              className="reveal hover-card"
-            >
-              <div>
-                <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: c.textoSub, marginBottom: "8px" }}>Esencial</p>
-                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#3B82F6", marginBottom: "16px", fontFamily: "Syne" }}>Básico</h3>
-                
-                <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
-                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$4.900</span>
-                  <span style={{ fontSize: "12px", color: c.textoSub, marginLeft: "4px" }}>/mes</span>
+              // Color del checkmark
+              const checkColor = esPremium ? "#ffffff" : (plan.color || "#14B8A6");
+
+              return (
+                <div 
+                  key={plan.id}
+                  style={cardStyles}
+                  className={cardClassName}
+                >
+                  {esPremium && (
+                    /* Badge */
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      right: "50%",
+                      transform: "translate(50%, -50%)",
+                      background: "#f59e0b",
+                      border: "1px solid rgba(255,255,255,0.25)",
+                      borderRadius: "20px",
+                      padding: "4px 14px",
+                      fontSize: "9px",
+                      fontWeight: 800,
+                      letterSpacing: "1px",
+                      textTransform: "uppercase",
+                      boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
+                    }}>
+                      {plan.subtitulo?.toUpperCase() || "RECOMENDADO"}
+                    </div>
+                  )}
+
+                  <div>
+                    <p style={{ 
+                      fontSize: "11px", 
+                      fontWeight: 700, 
+                      textTransform: "uppercase", 
+                      letterSpacing: "1px", 
+                      color: esPremium ? "rgba(255,255,255,0.75)" : c.textoSub, 
+                      marginBottom: "8px",
+                      marginTop: esPremium ? "4px" : "0px"
+                    }}>
+                      {plan.subtitulo}
+                    </p>
+                    <h3 style={{ 
+                      fontSize: "24px", 
+                      fontWeight: 800, 
+                      color: esPremium ? "#ffffff" : (plan.color || "#64748B"), 
+                      marginBottom: "16px", 
+                      fontFamily: "Syne" 
+                    }}>
+                      {plan.nombre}
+                    </h3>
+                    
+                    <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
+                      <span style={{ fontSize: "36px", fontWeight: 800 }}>
+                        ${plan.cuota === 0 ? "0" : plan.cuota?.toLocaleString()}
+                      </span>
+                      <span style={{ 
+                        fontSize: "12px", 
+                        color: esPremium ? "rgba(255,255,255,0.75)" : c.textoSub, 
+                        marginLeft: "4px" 
+                      }}>/mes</span>
+                    </div>
+
+                    <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {(plan.beneficios || []).map((beneficio, i) => (
+                        <li key={i} style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                          <span style={{ color: checkColor, fontWeight: 800 }}>✓</span>
+                          <span>{beneficio}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={() => irALogin(true, "usuario")}
+                    style={btnStyles}
+                    className={btnClassName}
+                  >
+                    {esFree ? "Comenzar Gratis" : `Comenzar con ${plan.nombre}`}
+                  </button>
                 </div>
-
-                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3B82F6", fontWeight: 800 }}>✓</span>
-                    <span>Descuento del 5% en comercios</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3B82F6", fontWeight: 800 }}>✓</span>
-                    <span>Tarjeta Física Estándar gratis</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3B82F6", fontWeight: 800 }}>✓</span>
-                    <span>Acceso completo al mapa de aliados</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3B82F6", fontWeight: 800 }}>✓</span>
-                    <span>Soporte prioritario por WhatsApp</span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => irALogin(true, "usuario")}
-                style={{ ...s.btnPrimary, width: "100%", padding: "12px 20px", background: "#3B82F6" }}
-                className="btn-hover"
-              >
-                Comenzar con Básico
-              </button>
-            </div>
-
-            {/* Plan Plus */}
-            <div 
-              style={{ ...estiloCard, justifyContent: "space-between" }}
-              className="reveal hover-card"
-            >
-              <div>
-                <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: c.textoSub, marginBottom: "8px" }}>Avanzado</p>
-                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#14B8A6", marginBottom: "16px", fontFamily: "Syne" }}>Plus</h3>
-                
-                <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
-                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$12.900</span>
-                  <span style={{ fontSize: "12px", color: c.textoSub, marginLeft: "4px" }}>/mes</span>
-                </div>
-
-                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#14B8A6", fontWeight: 800 }}>✓</span>
-                    <span>Descuento del 10% en comercios</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#14B8A6", fontWeight: 800 }}>✓</span>
-                    <span>Tarjeta Física Personalizada</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#14B8A6", fontWeight: 800 }}>✓</span>
-                    <span>Prioridad y Soporte 24/7</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#14B8A6", fontWeight: 800 }}>✓</span>
-                    <span>Preventas y ofertas especiales</span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => irALogin(true, "usuario")}
-                style={{ ...s.btnPrimary, width: "100%", padding: "12px 20px", background: "#14B8A6" }}
-                className="btn-hover"
-              >
-                Comenzar con Plus
-              </button>
-            </div>
-
-            {/* Plan Premium */}
-            <div 
-              style={{
-                ...estiloCard,
-                justifyContent: "space-between",
-                background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 50%, #4338CA 100%)",
-                border: "1px solid rgba(255, 255, 255, 0.25)",
-                color: "#ffffff",
-                position: "relative",
-                transform: "scale(1.01)",
-                boxShadow: "0 15px 40px rgba(124, 58, 237, 0.35)",
-              }}
-              className="reveal hover-card-lifestyle"
-            >
-              {/* Badge */}
-              <div style={{
-                position: "absolute",
-                top: 0,
-                right: "50%",
-                transform: "translate(50%, -50%)",
-                background: "#f59e0b",
-                border: "1px solid rgba(255,255,255,0.25)",
-                borderRadius: "20px",
-                padding: "4px 14px",
-                fontSize: "9px",
-                fontWeight: 800,
-                letterSpacing: "1px",
-                textTransform: "uppercase",
-                boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
-              }}>
-                RECOMENDADO
-              </div>
-              
-              <div>
-                <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "rgba(255,255,255,0.75)", marginBottom: "8px", marginTop: "4px" }}>RECOMENDADO</p>
-                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#ffffff", marginBottom: "16px", fontFamily: "Syne" }}>Premium</h3>
-                
-                <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
-                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$24.900</span>
-                  <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginLeft: "4px" }}>/mes</span>
-                </div>
-
-                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>Descuento del 15% en comercios</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>Tarjeta Metálica Black exclusiva</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>1% de Cashback acumulable</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>Salas VIP y eventos exclusivos</span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => irALogin(true, "usuario")}
-                style={{
-                  ...s.btnPrimary,
-                  width: "100%",
-                  padding: "12px 20px",
-                  background: "#ffffff",
-                  color: "#7C3AED",
-                  boxShadow: "0 10px 25px rgba(255,255,255,0.2)",
-                }}
-                className="btn-hover-white"
-              >
-                Comenzar con Premium
-              </button>
-            </div>
-
+              );
+            })}
           </div>
 
         </div>
