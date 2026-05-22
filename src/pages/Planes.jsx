@@ -12,7 +12,11 @@ export default function Planes() {
       getDocs(collection(db, "planes")),
       getDocs(collection(db, "usuarios")),
     ]);
-    setPlanes(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const planOrder = ["free", "basico", "plus", "premium"];
+    const sortedPlanes = pSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => planOrder.indexOf(a.id) - planOrder.indexOf(b.id));
+    setPlanes(sortedPlanes);
     setUsuarios(uSnap.docs.map(d => d.data()));
   };
 
@@ -60,10 +64,10 @@ export default function Planes() {
                   <h2 style={{ fontFamily: "Syne", fontSize: "24px", fontWeight: 800, color: c.accent }}>{plan.nombre}</h2>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontFamily: "Syne", fontSize: "22px", fontWeight: 800, color: "#1A2B3C" }}>
+                  <div style={{ fontFamily: "Syne", fontSize: "22px", fontWeight: 800, color: "var(--texto)" }}>
                     ${plan.cuota?.toLocaleString()}
                   </div>
-                  <div style={{ fontSize: "11px", color: "#9CA3AF" }}>/mes</div>
+                  <div style={{ fontSize: "11px", color: "var(--texto-sub)" }}>/mes</div>
                 </div>
               </div>
 
@@ -82,7 +86,7 @@ export default function Planes() {
               {/* Benefits */}
               <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
                 {(plan.beneficios || []).map((b, i) => (
-                  <li key={i} style={{ display: "flex", gap: "8px", fontSize: "12px", color: "#374151" }}>
+                  <li key={i} style={{ display: "flex", gap: "8px", fontSize: "12px", color: "var(--texto)" }}>
                     <span style={{ color: c.accent, flexShrink: 0, marginTop: "1px" }}>✓</span>
                     {b}
                   </li>
@@ -139,8 +143,8 @@ export default function Planes() {
               <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                 <button onClick={handleSave} className="btn-primary">Guardar cambios</button>
                 <button onClick={() => setEditPlan(null)} style={{
-                  flex: 1, padding: "12px", border: "2px solid #E5E7EB", borderRadius: "10px",
-                  background: "white", cursor: "pointer", fontWeight: 600, color: "#6B7280"
+                  flex: 1, padding: "12px", border: "2px solid var(--borde)", borderRadius: "10px",
+                  background: "transparent", cursor: "pointer", fontWeight: 600, color: "var(--texto)"
                 }}>Cancelar</button>
               </div>
             </div>
