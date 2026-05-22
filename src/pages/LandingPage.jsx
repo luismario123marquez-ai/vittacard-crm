@@ -232,6 +232,11 @@ export default function LandingPage() {
           grid-template-columns: repeat(3, 1fr);
           gap: 24px;
         }
+        .grid-4-col {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 24px;
+        }
         .grid-2-col {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
@@ -275,7 +280,7 @@ export default function LandingPage() {
             align-items: center !important;
             text-align: center !important;
           }
-          .grid-3-col {
+          .grid-3-col, .grid-4-col {
             grid-template-columns: 1fr;
           }
           .section-container {
@@ -740,7 +745,7 @@ export default function LandingPage() {
                       textTransform: "uppercase",
                       letterSpacing: "1.5px"
                     }}>
-                      Platinum
+                      Premium
                     </span>
                   </div>
                 </div>
@@ -932,7 +937,7 @@ export default function LandingPage() {
             </span>
             <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "8px" }}>Elige tu plan</h3>
             <p style={{ fontSize: "12px", lineHeight: 1.55, color: c.textoSub }}>
-              Selecciona la membresía que más se adapte a tus necesidades entre Essential, LifeStyle o Platinum.
+              Selecciona la membresía que más se adapte a tus necesidades entre Free, Básico, Plus o Premium.
             </p>
           </div>
 
@@ -1069,66 +1074,156 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid-3-col" style={{ alignItems: "stretch" }}>
+          <div className="grid-4-col" style={{ alignItems: "stretch" }}>
             
-            {/* Plan Essential */}
+            {/* Plan Free */}
             <div 
               style={{ ...estiloCard, justifyContent: "space-between" }}
               className="reveal hover-card"
             >
               <div>
-                <p style={{ fontSize: "11px", fontWeight: 700, uppercase: "true", letterSpacing: "1px", color: c.textoSub, marginBottom: "8px" }}>PARA COMENZAR</p>
-                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#00B4B4", marginBottom: "16px", fontFamily: "Syne" }}>Essential</h3>
+                <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: c.textoSub, marginBottom: "8px" }}>Básico</p>
+                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#64748B", marginBottom: "16px", fontFamily: "Syne" }}>Free</h3>
                 
                 <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
-                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$9.999</span>
+                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$0</span>
                   <span style={{ fontSize: "12px", color: c.textoSub, marginLeft: "4px" }}>/mes</span>
                 </div>
 
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
                   <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#00B4B4", fontWeight: 800 }}>✓</span>
-                    <span>5% descuento en medicina y exámenes</span>
+                    <span style={{ color: "#64748B", fontWeight: 800 }}>✓</span>
+                    <span>Tarjeta Digital inmediata</span>
                   </li>
                   <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#00B4B4", fontWeight: 800 }}>✓</span>
-                    <span>Cashback del 5% en ofertas seleccionadas</span>
+                    <span style={{ color: "#64748B", fontWeight: 800 }}>✓</span>
+                    <span>Acceso básico al mapa de aliados</span>
                   </li>
                   <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#00B4B4", fontWeight: 800 }}>✓</span>
-                    <span>Registro de gastos automatizado</span>
+                    <span style={{ color: "#64748B", fontWeight: 800 }}>✓</span>
+                    <span>Soporte estándar por correo</span>
                   </li>
                   <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#00B4B4", fontWeight: 800 }}>✓</span>
-                    <span>5% descuento en tiendas aliadas</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#00B4B4", fontWeight: 800 }}>✓</span>
-                    <span>Acceso a red de aliados</span>
+                    <span style={{ color: "#64748B", fontWeight: 800 }}>✓</span>
+                    <span>Sin cuota mensual (Totalmente Gratis)</span>
                   </li>
                 </ul>
               </div>
 
               <button
                 onClick={() => irALogin(true, "usuario")}
-                style={{ ...s.btnPrimary, width: "100%", padding: "12px 20px" }}
-                className="btn-hover"
+                style={{
+                  ...s.btnPrimary,
+                  width: "100%",
+                  padding: "12px 20px",
+                  background: modoOscuro ? "rgba(255,255,255,0.08)" : "#64748B",
+                  border: modoOscuro ? "1px solid rgba(255,255,255,0.15)" : "none",
+                  color: "#ffffff",
+                  boxShadow: "none",
+                }}
+                className="btn-hover-ghost"
               >
-                Comenzar con Essential
+                Comenzar Gratis
               </button>
             </div>
 
-            {/* Plan LifeStyle (Destacada con gradiente premium) */}
+            {/* Plan Básico */}
+            <div 
+              style={{ ...estiloCard, justifyContent: "space-between" }}
+              className="reveal hover-card"
+            >
+              <div>
+                <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: c.textoSub, marginBottom: "8px" }}>Esencial</p>
+                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#3B82F6", marginBottom: "16px", fontFamily: "Syne" }}>Básico</h3>
+                
+                <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
+                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$4.900</span>
+                  <span style={{ fontSize: "12px", color: c.textoSub, marginLeft: "4px" }}>/mes</span>
+                </div>
+
+                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#3B82F6", fontWeight: 800 }}>✓</span>
+                    <span>Descuento del 5% en comercios</span>
+                  </li>
+                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#3B82F6", fontWeight: 800 }}>✓</span>
+                    <span>Tarjeta Física Estándar gratis</span>
+                  </li>
+                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#3B82F6", fontWeight: 800 }}>✓</span>
+                    <span>Acceso completo al mapa de aliados</span>
+                  </li>
+                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#3B82F6", fontWeight: 800 }}>✓</span>
+                    <span>Soporte prioritario por WhatsApp</span>
+                  </li>
+                </ul>
+              </div>
+
+              <button
+                onClick={() => irALogin(true, "usuario")}
+                style={{ ...s.btnPrimary, width: "100%", padding: "12px 20px", background: "#3B82F6" }}
+                className="btn-hover"
+              >
+                Comenzar con Básico
+              </button>
+            </div>
+
+            {/* Plan Plus */}
+            <div 
+              style={{ ...estiloCard, justifyContent: "space-between" }}
+              className="reveal hover-card"
+            >
+              <div>
+                <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: c.textoSub, marginBottom: "8px" }}>Avanzado</p>
+                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#14B8A6", marginBottom: "16px", fontFamily: "Syne" }}>Plus</h3>
+                
+                <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
+                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$12.900</span>
+                  <span style={{ fontSize: "12px", color: c.textoSub, marginLeft: "4px" }}>/mes</span>
+                </div>
+
+                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#14B8A6", fontWeight: 800 }}>✓</span>
+                    <span>Descuento del 10% en comercios</span>
+                  </li>
+                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#14B8A6", fontWeight: 800 }}>✓</span>
+                    <span>Tarjeta Física Personalizada</span>
+                  </li>
+                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#14B8A6", fontWeight: 800 }}>✓</span>
+                    <span>Prioridad y Soporte 24/7</span>
+                  </li>
+                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
+                    <span style={{ color: "#14B8A6", fontWeight: 800 }}>✓</span>
+                    <span>Preventas y ofertas especiales</span>
+                  </li>
+                </ul>
+              </div>
+
+              <button
+                onClick={() => irALogin(true, "usuario")}
+                style={{ ...s.btnPrimary, width: "100%", padding: "12px 20px", background: "#14B8A6" }}
+                className="btn-hover"
+              >
+                Comenzar con Plus
+              </button>
+            </div>
+
+            {/* Plan Premium */}
             <div 
               style={{
                 ...estiloCard,
                 justifyContent: "space-between",
-                background: "linear-gradient(135deg, #4f46e5 0%, #2563eb 50%, #00b4b4 100%)",
+                background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 50%, #4338CA 100%)",
                 border: "1px solid rgba(255, 255, 255, 0.25)",
                 color: "#ffffff",
                 position: "relative",
                 transform: "scale(1.01)",
-                boxShadow: "0 15px 40px rgba(79, 70, 229, 0.35)",
+                boxShadow: "0 15px 40px rgba(124, 58, 237, 0.35)",
               }}
               className="reveal hover-card-lifestyle"
             >
@@ -1138,7 +1233,7 @@ export default function LandingPage() {
                 top: 0,
                 right: "50%",
                 transform: "translate(50%, -50%)",
-                background: "#10b981",
+                background: "#f59e0b",
                 border: "1px solid rgba(255,255,255,0.25)",
                 borderRadius: "20px",
                 padding: "4px 14px",
@@ -1148,38 +1243,34 @@ export default function LandingPage() {
                 textTransform: "uppercase",
                 boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
               }}>
-                MÁS POPULAR
+                RECOMENDADO
               </div>
               
               <div>
-                <p style={{ fontSize: "11px", fontWeight: 700, uppercase: "true", letterSpacing: "1px", color: "rgba(255,255,255,0.75)", marginBottom: "8px", marginTop: "4px" }}>MÁS POPULAR</p>
-                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#ffffff", marginBottom: "16px", fontFamily: "Syne" }}>LifeStyle</h3>
+                <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "rgba(255,255,255,0.75)", marginBottom: "8px", marginTop: "4px" }}>RECOMENDADO</p>
+                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#ffffff", marginBottom: "16px", fontFamily: "Syne" }}>Premium</h3>
                 
                 <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
-                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$25.999</span>
+                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$24.900</span>
                   <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginLeft: "4px" }}>/mes</span>
                 </div>
 
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
                   <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
                     <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>10% descuento en medicina y exámenes</span>
+                    <span>Descuento del 15% en comercios</span>
                   </li>
                   <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
                     <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>CashBack del 10% en ofertas exclusivas</span>
+                    <span>Tarjeta Metálica Black exclusiva</span>
                   </li>
                   <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
                     <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>Descuentos del 10% en mensualidades</span>
+                    <span>1% de Cashback acumulable</span>
                   </li>
                   <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
                     <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>10% descuento en tiendas aliadas</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ fontWeight: 800 }}>✓</span>
-                    <span>Soporte prioritario</span>
+                    <span>Salas VIP y eventos exclusivos</span>
                   </li>
                 </ul>
               </div>
@@ -1191,67 +1282,12 @@ export default function LandingPage() {
                   width: "100%",
                   padding: "12px 20px",
                   background: "#ffffff",
-                  color: "#4f46e5",
+                  color: "#7C3AED",
                   boxShadow: "0 10px 25px rgba(255,255,255,0.2)",
                 }}
                 className="btn-hover-white"
               >
-                Comenzar con LifeStyle
-              </button>
-            </div>
-
-            {/* Plan Platinum */}
-            <div 
-              style={{ ...estiloCard, justifyContent: "space-between" }}
-              className="reveal hover-card"
-            >
-              <div>
-                <p style={{ fontSize: "11px", fontWeight: 700, uppercase: "true", letterSpacing: "1px", color: c.textoSub, marginBottom: "8px" }}>PARA EL MÁXIMO BENEFICIO</p>
-                <h3 style={{ fontSize: "24px", fontWeight: 800, color: "#3b82f6", marginBottom: "16px", fontFamily: "Syne" }}>Platinum</h3>
-                
-                <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
-                  <span style={{ fontSize: "36px", fontWeight: 800 }}>$35.999</span>
-                  <span style={{ fontSize: "12px", color: c.textoSub, marginLeft: "4px" }}>/mes</span>
-                </div>
-
-                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3b82f6", fontWeight: 800 }}>✓</span>
-                    <span>20% descuento en medicina y exámenes</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3b82f6", fontWeight: 800 }}>✓</span>
-                    <span>CashBack del 20% en ofertas exclusivas</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3b82f6", fontWeight: 800 }}>✓</span>
-                    <span>Descuentos del 20% en mensualidades</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3b82f6", fontWeight: 800 }}>✓</span>
-                    <span>15% descuento en tiendas aliadas</span>
-                  </li>
-                  <li style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "#3b82f6", fontWeight: 800 }}>✓</span>
-                    <span>Soporte VIP 24/7</span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => irALogin(true, "usuario")}
-                style={{
-                  ...s.btnPrimary,
-                  width: "100%",
-                  padding: "12px 20px",
-                  background: modoOscuro ? "rgba(255,255,255,0.08)" : "#1e293b",
-                  border: modoOscuro ? "1px solid rgba(255,255,255,0.15)" : "none",
-                  color: "#ffffff",
-                  boxShadow: "none",
-                }}
-                className="btn-hover-ghost"
-              >
-                Comenzar con Platinum
+                Comenzar con Premium
               </button>
             </div>
 
