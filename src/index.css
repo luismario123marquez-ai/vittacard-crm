@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Variables globales ──────────────────────────────────────────────────── */
+:root {
+  --azul:       #1e3a5f;
+  --azul-medio: #0369a1;
+  --azul-claro: #e0f2fe;
+  --morado:     #4338ca;
+  --gris-fondo: #eef2f7;
+  --texto:      #1e293b;
+  --texto-sub:  #64748b;
+  --borde:      #e2e8f0;
+}
+
+body.dark {
+  --gris-fondo: #0f172a;
+  --texto:      #f8fafc;
+  --texto-sub:  #94a3b8;
+  --borde:      #334155;
+}
+
+body.dark .card {
+  background: #1e293b !important;
+  color: var(--texto) !important;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05) !important;
+}
+
+body.dark .input-field {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+body.dark .input-field:focus {
+  border-color: #06B6D4 !important;
+}
+
+/* ─── Reset y base ────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: var(--gris-fondo);
+  color: var(--texto);
+  font-size: 13.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Títulos con peso correcto */
+h1, h2, h3, h4 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+/* ─── Tarjeta ─────────────────────────────────────────────────────────────── */
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+}
+
+/* ─── Botón principal ─────────────────────────────────────────────────────── */
+.btn-primary {
+  background: var(--azul);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 11px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.1px;
+  transition: background 0.2s;
+}
+.btn-primary:hover { background: #162d4a; }
+
+/* ─── Campo de texto ──────────────────────────────────────────────────────── */
+.input-field {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--borde);
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: var(--texto);
+  background: #f8fafc;
+  outline: none;
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: border-color 0.2s;
+}
+.input-field:focus { border-color: var(--azul-medio); }
+
+/* ─── Etiquetas de estado ─────────────────────────────────────────────────── */
+.etiqueta {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.etiqueta-verde  { background: #dcfce7; color: #15803d; }
+.etiqueta-roja   { background: #fee2e2; color: #b91c1c; }
+.etiqueta-azul   { background: #dbeafe; color: #1d4ed8; }
+.etiqueta-gris   { background: #f1f5f9; color: #475569; }
+
+/* ─── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+
+/* ─── Responsividad Manual (VittaCard) ────────────────────────────────────── */
+.desktop-only {
+  display: flex !important;
+}
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 1023px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: flex !important;
+  }
+}
+

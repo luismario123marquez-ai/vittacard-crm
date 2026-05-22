@@ -1,0 +1,1837 @@
+import { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { auth, db } from "../../firebase/config";
+import { collection, getDocs, query, where, doc, updateDoc, addDoc, getDoc, deleteDoc, runTransaction } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
+import { updatePassword } from "firebase/auth";
+import MapaAliados from "../../components/MapaAliados";
+import { Store, Activity, Dumbbell, ShoppingCart, Utensils, Pill, MapPin, Phone } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
+
+export default function UsuarioDashboard() {
+  const { currentUser, logout, theme, toggleTheme } = useAuth();
+  const navigate = useNavigate();
+  const [perfil, setPerfil] = useState(null);
+  const [perfilId, setPerfilId] = useState(null);
+  const [transacciones, setTransacciones] = useState([]);
+  const [planes, setPlanes] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [aliados, setAliados] = useState([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [seccion, setSeccion] = useState("membresia"); // Ver planes inmediatamente al iniciar sesión
+
+  // Estados para Ajustes de Perfil (Fase 3)
+  const [editTelefono, setEditTelefono] = useState("");
+  const [nuevaContrasena, setNuevaContrasena] = useState("");
+  const [msgAjustes, setMsgAjustes] = useState("");
+  const [errorAjustes, setErrorAjustes] = useState("");
+  const [verContrasena, setVerContrasena] = useState(false);
+  const [vistaComercios, setVistaComercios] = useState("lista");
+
+  // Estados de modales
+  const [modalEnviar, setModalEnviar] = useState(false);
+  const [modalRecargar, setModalRecargar] = useState(false);
+  const [modalRecibir, setModalRecibir] = useState(false);
+  const [modalEscanearQR, setModalEscanearQR] = useState(false);
+
+  // Estados para Pago QR (Fase 1)
+  const [intentIdQR, setIntentIdQR] = useState("");
+  const [intentData, setIntentData] = useState(null);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const [procesandoPagoQR, setProcesandoPagoQR] = useState(false);
+
+  // Estados de carga (loading spinners)
+  const [procesandoPSE, setProcesandoPSE] = useState(false);
+  const [enviandoDinero, setEnviandoDinero] = useState(false);
+  const [guardandoAjustes, setGuardandoAjustes] = useState(false);
+
+  // Formularios de modales
+  const [formEnviar, setFormEnviar] = useState({ destinatario: "", monto: "", categoria: "Otro" });
+  const [formRecargar, setFormRecargar] = useState({ monto: "", tarjeta: "5200-XXXX-XXXX-XXXX" });
+  const [mensajeExito, setMensajeExito] = useState("");
+  const [errorTransaccion, setErrorTransaccion] = useState("");
+
+  // Búsqueda de destinatarios
+  const [searchQuery, setSearchQuery] = useState("");
+  const [destEncontrado, setDestEncontrado] = useState(null);
+  const [searchError, setSearchError] = useState("");
+  const [buscando, setBuscando] = useState(false);
+
+  // Búsqueda en historial
+  const [searchTx, setSearchTx] = useState("");
+
+  // Estilos de tema dinámicos
+  const themeStyles = {
+    bg: theme === "dark" ? "#0F172A" : "#F8FAFC",
+    cardBg: theme === "dark" ? "#1E293B" : "#fff",
+    border: theme === "dark" ? "#334155" : "#E2E8F0",
+    text: theme === "dark" ? "#f8fafc" : "#1E293B",
+    textMuted: theme === "dark" ? "#94A3B8" : "#64748B",
+    sidebarBg: theme === "dark" ? "#1E293B" : "#fff",
+    headerBg: "#0F172A",
+  };
+
+  const seedAliadosIfNeeded = async (existingAllies) => {
+    const hasEstancia = existingAllies.some(a => (a.nombre || "").toLowerCase().includes("estancia"));
+    if (hasEstancia) return existingAllies;
+
+    console.log("Seeding realistic allies for Popayán...");
+    const mockAllies = [
+      {
+        nombre: "Clínica La Estancia",
+        sector: "Salud",
+        nit: "900.123.456-1",
+        ubicacion: "Calle 15N # 6-30, Popayán",
+        telefono: "602 8331111",
+        activo: true,
+        creadoEn: new Date()
+      },
+      {
+        nombre: "Hospital Universitario San José",
+        sector: "Salud",
+        nit: "891.500.160-2",
+        ubicacion: "Carrera 6 # 10N-142, Popayán",
+        telefono: "602 8234321",
+        activo: true,
+        creadoEn: new Date()
+      },
+      {
+        nombre: "Farmatodo Panamericana",
+        sector: "Farmacia",
+        nit: "900.876.543-3",
+        ubicacion: "Carrera 9 # 25N-40, Popayán",
+        telefono: "3104523987",
+        activo: true,
+        creadoEn: new Date()
+      },
+      {
+        nombre: "Smart Fit Campanario",
+        sector: "Deporte",
+        nit: "901.321.654-4",
+        ubicacion: "Centro Comercial Campanario, Popayán",
+        telefono: "3187654321",
+        activo: true,
+        creadoEn: new Date()
+      },
+      {
+        nombre: "Villas Gym",
+        sector: "Deporte",
+        nit: "900.456.789-5",
+        ubicacion: "Carrera 9 # 18N-22, Popayán",
+        telefono: "3216549870",
+        activo: true,
+        creadoEn: new Date()
+      },
+      {
+        nombre: "Nicki Burguer",
+        sector: "Restaurante",
+        nit: "901.987.654-6",
+        ubicacion: "Carrera 8 # 5-42, Centro, Popayán",
+        telefono: "3145698712",
+        activo: true,
+        creadoEn: new Date()
+      },
+      {
+        nombre: "Mora Castilla",
+        sector: "Restaurante",
+        nit: "900.543.210-7",
+        ubicacion: "Calle 4 # 7-33, Centro Histórico, Popayán",
+        telefono: "3004561234",
+        activo: true,
+        creadoEn: new Date()
+      },
+      {
+        nombre: "Merca Fruver La 13",
+        sector: "Supermercado",
+        nit: "891.120.340-8",
+        ubicacion: "Carrera 13 # 5-10, Popayán",
+        telefono: "3117894562",
+        activo: true,
+        creadoEn: new Date()
+      }
+    ];
+
+    // Delete existing placeholder allies (no email associated, i.e. !a.correo)
+    const deletePromises = existingAllies
+      .filter(a => !a.correo)
+      .map(a => deleteDoc(doc(db, "aliados", a.id)));
+    
+    await Promise.all(deletePromises);
+
+    const addedAllies = [];
+    for (const ally of mockAllies) {
+      const docRef = await addDoc(collection(db, "aliados"), ally);
+      addedAllies.push({ id: docRef.id, ...ally });
+    }
+
+    const remainingAllies = existingAllies.filter(a => a.correo);
+    return [...remainingAllies, ...addedAllies];
+  };
+
+  const loadData = async () => {
+    try {
+      // 1. Cargar Perfil de Usuario
+      const uSnap = await getDocs(query(collection(db, "usuarios"), where("correo", "==", currentUser.email)));
+      let userDoc = uSnap.docs[0]?.data();
+      let docId = uSnap.docs[0]?.id;
+
+      if (!userDoc) {
+        userDoc = { 
+          nombres: currentUser.email, 
+          correo: currentUser.email, 
+          planId: "essential", 
+          cuenta: "5200-9999-8888-7777", 
+          activo: true,
+          saldo: 150000
+        };
+      } else {
+        setPerfilId(docId);
+        
+        let updates = {};
+        // Inicializar saldo
+        if (userDoc.saldo === undefined) {
+          updates.saldo = 150000;
+          userDoc.saldo = 150000;
+        }
+        // Generar llave única si no existe
+        if (!userDoc.llave) {
+          const generatedLlave = "VT-" + Math.random().toString(36).substr(2, 6).toUpperCase();
+          updates.llave = generatedLlave;
+          userDoc.llave = generatedLlave;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await updateDoc(doc(db, "usuarios", docId), updates);
+        }
+      }
+      setPerfil(userDoc);
+      setEditTelefono(userDoc.telefono || "");
+
+      // 2. Cargar Transacciones del usuario
+      const tSnap = await getDocs(collection(db, "transacciones"));
+      const txs = tSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.usuarioNombre === userDoc.nombres);
+      
+      // Ordenar por fecha descendente
+      const sortedTxs = txs.sort((a, b) => {
+        const dateA = a.fecha?.toDate?.() || new Date(a.fecha) || 0;
+        const dateB = b.fecha?.toDate?.() || new Date(b.fecha) || 0;
+        return dateB - dateA;
+      });
+      setTransacciones(sortedTxs);
+
+      // 3. Cargar Planes
+      const pSnap = await getDocs(collection(db, "planes"));
+      setPlanes(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // 4. Cargar destinatarios (usuarios y aliados)
+      const otherUsersSnap = await getDocs(collection(db, "usuarios"));
+      setUsuarios(otherUsersSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => u.correo !== currentUser.email));
+
+      const alliesSnap = await getDocs(collection(db, "aliados"));
+      const initialAllies = alliesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const finalAllies = await seedAliadosIfNeeded(initialAllies);
+      setAliados(finalAllies);
+
+      setLoading(false);
+    } catch (err) {
+      console.error("Error cargando datos del dashboard:", err);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      loadData();
+    }
+  }, [currentUser]);
+
+  // Manejo de Scanner QR Lifecycle
+  useEffect(() => {
+    let scanner = null;
+    if (modalEscanearQR && !confirmingPayment && !procesandoPagoQR) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById("reader");
+        if (element) {
+          scanner = new Html5Qrcode("reader");
+          scanner.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            (decodedText) => {
+              handlePaymentScanned(decodedText);
+            },
+            (err) => {
+              // Non-blocking scan errors
+            }
+          ).catch((err) => {
+            console.error("Error starting camera:", err);
+            setScanError("No se pudo iniciar la cámara. Verifica los permisos o usa el Modo Dev.");
+          });
+        }
+      }, 300);
+
+      return () => {
+        clearTimeout(timer);
+        if (scanner) {
+          if (scanner.isScanning) {
+            scanner.stop().then(() => {
+              scanner.clear();
+            }).catch(err => console.error("Error stopping scanner:", err));
+          }
+        }
+      };
+    }
+  }, [modalEscanearQR, confirmingPayment, procesandoPagoQR]);
+
+  const calcularMontoFinal = (montoOriginal, planId, sector) => {
+    const descText = obtenerDescuento(planId, sector);
+    const descPct = parseInt(descText.replace("%", ""), 10) || 5;
+    const descuento = (montoOriginal * descPct) / 100;
+    return {
+      descuento,
+      montoFinal: Math.max(0, montoOriginal - descuento),
+      descText
+    };
+  };
+
+  const handlePaymentScanned = async (id) => {
+    if (!id || !id.trim()) return;
+    setProcesandoPagoQR(true);
+    setScanError("");
+    try {
+      const intentSnap = await getDoc(doc(db, "intentos_pago", id.trim()));
+      if (!intentSnap.exists()) {
+        setScanError("El código QR no corresponde a un cobro válido o expiró.");
+        setProcesandoPagoQR(false);
+        return;
+      }
+      const data = intentSnap.data();
+      if (data.estado !== "pendiente") {
+        setScanError(`Este cobro ya no está disponible (Estado: ${data.estado}).`);
+        setProcesandoPagoQR(false);
+        return;
+      }
+      setIntentIdQR(id.trim());
+      setIntentData(data);
+      setConfirmingPayment(true);
+    } catch (err) {
+      console.error("Error al procesar QR:", err);
+      setScanError("Error al consultar la información del cobro.");
+    } finally {
+      setProcesandoPagoQR(false);
+    }
+  };
+
+  const handleConfirmarPagoQR = async () => {
+    if (!intentIdQR || !intentData || !perfilId) return;
+    setProcesandoPagoQR(true);
+    setErrorTransaccion("");
+    try {
+      const userRef = doc(db, "usuarios", perfilId);
+      const intentRef = doc(db, "intentos_pago", intentIdQR);
+      const allyRef = doc(db, "aliados", intentData.comercioId);
+
+      const finalMonto = calcularMontoFinal(intentData.monto, perfil.planId, intentData.comercioSector);
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        const intentSnap = await transaction.get(intentRef);
+        const allySnap = await transaction.get(allyRef);
+
+        if (!userSnap.exists()) throw new Error("El usuario no existe.");
+        if (!intentSnap.exists()) throw new Error("El cobro ya no existe.");
+        if (!allySnap.exists()) throw new Error("El comercio asociado no existe.");
+
+        if (intentSnap.data().estado !== "pendiente") {
+          throw new Error("Este cobro ya fue procesado o cancelado.");
+        }
+
+        const currentSaldo = userSnap.data().saldo ?? 0;
+        if (currentSaldo < finalMonto.montoFinal) {
+          throw new Error("Saldo insuficiente para pagar este cobro.");
+        }
+
+        const comisionRate = allySnap.data().comision !== undefined ? allySnap.data().comision : 0.02;
+        const comisionMonto = finalMonto.montoFinal * comisionRate;
+        const netoComercio = finalMonto.montoFinal - comisionMonto;
+
+        transaction.update(userRef, { saldo: currentSaldo - finalMonto.montoFinal });
+        transaction.update(allyRef, { saldo: (allySnap.data().saldo || 0) + netoComercio });
+
+        transaction.update(intentRef, {
+          estado: "completado",
+          pagadoPor: perfilId,
+          pagadoPorNombre: perfil.nombres,
+          montoFinal: finalMonto.montoFinal,
+          descuentoMonto: finalMonto.descuento,
+          comisionMonto: comisionMonto,
+          fechaPago: new Date()
+        });
+
+        const newTxRef = doc(collection(db, "transacciones"));
+        transaction.set(newTxRef, {
+          usuarioNombre: perfil.nombres,
+          usuarioId: perfilId,
+          comercio: intentData.comercioNombre,
+          comercioId: intentData.comercioId,
+          monto: finalMonto.montoFinal,
+          montoOriginal: intentData.monto,
+          descuento: finalMonto.descuento,
+          comision: comisionMonto,
+          categoria: intentData.comercioSector || "Otro",
+          fecha: new Date(),
+          estado: "completada",
+          tipo: "pago_qr",
+          intentId: intentIdQR
+        });
+      });
+
+      setMensajeExito(`¡Pago de $${finalMonto.montoFinal.toLocaleString()} a ${intentData.comercioNombre} procesado con éxito!`);
+      setModalEscanearQR(false);
+      setIntentIdQR("");
+      setIntentData(null);
+      setConfirmingPayment(false);
+      
+      setTimeout(() => setMensajeExito(""), 4000);
+      await loadData();
+    } catch (err) {
+      console.error("Error en la transacción de pago QR:", err);
+      setErrorTransaccion(err.message || "Error al procesar el pago.");
+      setTimeout(() => setErrorTransaccion(""), 4000);
+    } finally {
+      setProcesandoPagoQR(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  // Buscar destinatario por correo o llave única
+  const handleBuscarDestinatario = async () => {
+    if (!searchQuery.trim()) return;
+    setBuscando(true);
+    setSearchError("");
+    setDestEncontrado(null);
+
+    const term = searchQuery.trim();
+
+    // Validar autotransferencia
+    if (term === currentUser.email || term === perfil?.llave) {
+      setSearchError("No puedes transferirte a ti mismo.");
+      setBuscando(false);
+      return;
+    }
+
+    try {
+      // Buscar en usuarios
+      let targetDoc = null;
+      const uSnap1 = await getDocs(query(collection(db, "usuarios"), where("correo", "==", term)));
+      const uSnap2 = await getDocs(query(collection(db, "usuarios"), where("llave", "==", term)));
+
+      if (!uSnap1.empty) {
+        targetDoc = { id: uSnap1.docs[0].id, ...uSnap1.docs[0].data(), tipo: "usuario" };
+      } else if (!uSnap2.empty) {
+        targetDoc = { id: uSnap2.docs[0].id, ...uSnap2.docs[0].data(), tipo: "usuario" };
+      }
+
+      // Si no es usuario, buscar en aliados
+      if (!targetDoc) {
+        const aSnap1 = await getDocs(query(collection(db, "aliados"), where("correo", "==", term)));
+        const aSnap2 = await getDocs(query(collection(db, "aliados"), where("llave", "==", term)));
+
+        if (!aSnap1.empty) {
+          targetDoc = { id: aSnap1.docs[0].id, ...aSnap1.docs[0].data(), tipo: "comercio" };
+        } else if (!aSnap2.empty) {
+          targetDoc = { id: aSnap2.docs[0].id, ...aSnap2.docs[0].data(), tipo: "comercio" };
+        }
+      }
+
+      if (targetDoc) {
+        setDestEncontrado(targetDoc);
+        setFormEnviar(prev => ({ ...prev, destinatario: targetDoc.nombres || targetDoc.nombre }));
+      } else {
+        setSearchError("No se encontró ningún usuario o comercio con esa llave o correo.");
+      }
+    } catch (err) {
+      console.error("Error buscando destinatario:", err);
+      setSearchError("Error al buscar en la base de datos.");
+    }
+    setBuscando(false);
+  };
+
+  // Manejar Recarga
+  const handleRecargarSubmit = async (e) => {
+    e.preventDefault();
+    const montoNum = Number(formRecargar.monto);
+    if (!montoNum || montoNum <= 0) return;
+    setProcesandoPSE(true);
+    try {
+      if (perfilId) {
+        const nuevoSaldo = (perfil.saldo || 0) + montoNum;
+        await updateDoc(doc(db, "usuarios", perfilId), { saldo: nuevoSaldo });
+        
+        await addDoc(collection(db, "transacciones"), {
+          usuarioNombre: perfil.nombres,
+          comercio: "VittaCard Recarga",
+          monto: montoNum,
+          categoria: "Alimentos",
+          fecha: new Date(),
+          estado: "completada"
+        });
+
+        setMensajeExito(`¡Recarga exitosa de $${montoNum.toLocaleString()}!`);
+        setFormRecargar({ monto: "", tarjeta: "5200-XXXX-XXXX-XXXX" });
+        setTimeout(() => setMensajeExito(""), 3000);
+        await loadData();
+      }
+      setModalRecargar(false);
+    } catch (err) {
+      console.error("Error al recargar:", err);
+    } finally {
+      setProcesandoPSE(false);
+    }
+  };
+
+  // Manejar Enviar Dinero
+  const handleEnviarSubmit = async (e) => {
+    e.preventDefault();
+    const montoNum = Number(formEnviar.monto);
+    if (!montoNum || montoNum <= 0) return;
+    if (!destEncontrado) {
+      setErrorTransaccion("Por favor, busca y selecciona un destinatario válido primero.");
+      return;
+    }
+    if (montoNum > (perfil.saldo || 0)) {
+      setErrorTransaccion("Saldo insuficiente para realizar esta transacción.");
+      setTimeout(() => setErrorTransaccion(""), 4000);
+      return;
+    }
+    setEnviandoDinero(true);
+    try {
+      if (perfilId) {
+        const nuevoSaldo = (perfil.saldo || 0) - montoNum;
+        
+        // 1. Descontar del saldo del usuario actual
+        await updateDoc(doc(db, "usuarios", perfilId), { saldo: nuevoSaldo });
+
+        // 2. Sumar al saldo si es un usuario
+        if (destEncontrado.tipo === "usuario" && destEncontrado.id) {
+          const saldoDestNuevo = (destEncontrado.saldo || 0) + montoNum;
+          await updateDoc(doc(db, "usuarios", destEncontrado.id), { saldo: saldoDestNuevo });
+        }
+
+        // 3. Registrar transacción
+        await addDoc(collection(db, "transacciones"), {
+          usuarioNombre: perfil.nombres,
+          comercio: destEncontrado.nombres || destEncontrado.nombre,
+          monto: montoNum,
+          categoria: formEnviar.categoria,
+          fecha: new Date(),
+          estado: "completada"
+        });
+
+        setMensajeExito(`¡Transferencia de $${montoNum.toLocaleString()} a ${destEncontrado.nombres || destEncontrado.nombre} realizada!`);
+        setFormEnviar({ destinatario: "", monto: "", categoria: "Otro" });
+        setSearchQuery("");
+        setDestEncontrado(null);
+        setTimeout(() => setMensajeExito(""), 3000);
+        await loadData();
+      }
+      setModalEnviar(false);
+    } catch (err) {
+      console.error("Error al enviar dinero:", err);
+    } finally {
+      setEnviandoDinero(false);
+    }
+  };
+
+  // Comprar / Cambiar de plan (Auditoría estricta de saldo Fase 3)
+  const handleAdquirirPlan = async (plan) => {
+    if (perfil.planId === plan.id) return;
+    setErrorTransaccion("");
+    setMensajeExito("");
+
+    try {
+      if (!perfilId) {
+        setErrorTransaccion("Error: ID de perfil no encontrado.");
+        setTimeout(() => setErrorTransaccion(""), 4000);
+        return;
+      }
+
+      // Lectura en tiempo real del saldo desde Firestore para auditoría
+      const userRef = doc(db, "usuarios", perfilId);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        setErrorTransaccion("Error: El usuario no existe en la base de datos.");
+        setTimeout(() => setErrorTransaccion(""), 4000);
+        return;
+      }
+      
+      const realSaldo = snap.data().saldo ?? 0;
+
+      // Validación matemática del saldo en tiempo real
+      if (realSaldo < plan.cuota) {
+        setErrorTransaccion("Saldo insuficiente para adquirir este plan.");
+        setTimeout(() => setErrorTransaccion(""), 4000);
+        return;
+      }
+
+      const nuevoSaldo = realSaldo - plan.cuota;
+
+      // Actualizar saldo y plan
+      await updateDoc(userRef, {
+        saldo: nuevoSaldo,
+        planId: plan.id
+      });
+
+      // Registrar la transacción
+      await addDoc(collection(db, "transacciones"), {
+        usuarioNombre: perfil.nombres,
+        comercio: "Suscripción VittaCard " + plan.nombre,
+        monto: plan.cuota,
+        categoria: "Servicios",
+        fecha: new Date(),
+        estado: "completada"
+      });
+
+      setMensajeExito(`¡Has adquirido el plan VittaCard ${plan.nombre} exitosamente!`);
+      setTimeout(() => setMensajeExito(""), 4000);
+      await loadData();
+    } catch (err) {
+      console.error("Error al adquirir plan:", err);
+      setErrorTransaccion("Ocurrió un error al procesar el cambio de plan.");
+      setTimeout(() => setErrorTransaccion(""), 4000);
+    }
+  };
+
+  const getCategoriaStyle = (sector) => {
+    const s = (sector || "Otro").toLowerCase();
+    switch (s) {
+      case "salud": return { bg: "bg-teal-50 dark:bg-teal-950/80 border border-teal-200/50 dark:border-teal-900/40", text: "text-teal-700 dark:text-teal-300" };
+      case "deporte": return { bg: "bg-violet-50 dark:bg-violet-950/80 border border-violet-200/50 dark:border-violet-900/40", text: "text-violet-700 dark:text-violet-300" };
+      case "supermercado": return { bg: "bg-amber-50 dark:bg-amber-950/80 border border-amber-200/50 dark:border-amber-900/40", text: "text-amber-700 dark:text-amber-300" };
+      case "restaurante": return { bg: "bg-orange-50 dark:bg-orange-950/80 border border-orange-200/50 dark:border-orange-900/40", text: "text-orange-700 dark:text-orange-300" };
+      case "farmacia": return { bg: "bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200/50 dark:border-emerald-900/40", text: "text-emerald-700 dark:text-emerald-300" };
+      case "entretenimiento": return { bg: "bg-blue-50 dark:bg-blue-950/80 border border-blue-200/50 dark:border-blue-900/40", text: "text-blue-700 dark:text-blue-300" };
+      default: return { bg: "bg-slate-50 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/40", text: "text-slate-700 dark:text-slate-300" };
+    }
+  };
+
+  const obtenerDescuento = (planId, sector) => {
+    const plan = (planId || "essential").toLowerCase();
+    const sec = (sector || "Otro").toLowerCase();
+    if (plan === "platinum") {
+      return sec === "salud" ? "20%" : "15%";
+    } else if (plan === "lifestyle") {
+      return (sec === "salud" || sec === "deporte") ? "10%" : "8%";
+    } else {
+      return "5%";
+    }
+  };
+
+  const handleGuardarAjustes = async (e) => {
+    e.preventDefault();
+    setMsgAjustes("");
+    setErrorAjustes("");
+    setGuardandoAjustes(true);
+    try {
+      if (perfilId) {
+        await updateDoc(doc(db, "usuarios", perfilId), {
+          telefono: editTelefono.trim()
+        });
+        setPerfil(prev => ({ ...prev, telefono: editTelefono.trim() }));
+        setMsgAjustes("Teléfono celular actualizado con éxito.");
+      }
+
+      if (nuevaContrasena.trim()) {
+        if (nuevaContrasena.trim().length < 6) {
+          setErrorAjustes("La contraseña debe tener mínimo 6 caracteres.");
+          setGuardandoAjustes(false);
+          return;
+        }
+        await updatePassword(auth.currentUser, nuevaContrasena.trim());
+        setMsgAjustes(prev => prev ? prev + " Y contraseña actualizada con éxito." : "Contraseña actualizada con éxito.");
+        setNuevaContrasena("");
+      }
+    } catch (err) {
+      console.error("Error al guardar ajustes:", err);
+      if (err.code === "auth/requires-recent-login") {
+        setErrorAjustes("Esta operación requiere que inicies sesión recientemente. Por favor, vuelve a iniciar sesión e intenta de nuevo.");
+      } else {
+        setErrorAjustes(err.message || "Ocurrió un error al guardar los ajustes.");
+      }
+    } finally {
+      setGuardandoAjustes(false);
+    }
+  };
+
+  if (loading) return <div style={{ padding: '40px', fontFamily: 'inherit' }}>Cargando portal...</div>;
+
+  // Botón lateral estilizado
+  const menuBtn = (id, label) => (
+    <button
+      onClick={() => setSeccion(id)}
+      style={{
+        background: seccion === id ? '#06B6D4' : themeStyles.sidebarBg,
+        color: seccion === id ? '#fff' : themeStyles.text,
+        border: '1px solid ' + themeStyles.border,
+        borderRadius: '10px',
+        padding: '10px 14px',
+        cursor: 'pointer',
+        fontWeight: 600,
+        textAlign: 'left',
+        transition: 'all 0.15s'
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  // Paleta de colores para planes
+  const planColors = {
+    essential: { bg: "#E0F7F7", accent: "#00B4B4", dark: "#008A8A" },
+    lifestyle: { bg: "#EDE9FE", accent: "#7C3AED", dark: "#6D28D9" },
+    platinum: { bg: "#E5E7EB", accent: "#1A2B3C", dark: "#111827" },
+  };
+
+  // Formatear Fecha
+  const formatDate = (fecha) => {
+    if (!fecha) return "—";
+    const d = fecha.toDate ? fecha.toDate() : new Date(fecha);
+    return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  };
+
+  // Filtrado de transacciones
+  const filteredTxs = transacciones.filter(t => 
+    t.comercio?.toLowerCase().includes(searchTx.toLowerCase()) || 
+    t.categoria?.toLowerCase().includes(searchTx.toLowerCase())
+  );
+
+  // Estadísticas de usuario
+  const userVolumenTotal = transacciones.reduce((acc, t) => acc + (t.monto || 0), 0);
+  const userPromedioTx = transacciones.length ? Math.round(userVolumenTotal / transacciones.length) : 0;
+
+  return (
+    <div style={{ minHeight: "100vh", background: themeStyles.bg, color: themeStyles.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.2s" }}>
+      
+      {/* Barra Superior */}
+      <div style={{ background: themeStyles.headerBg, padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: "22px" }}>💳</span>
+          <h2 style={{ color: '#fff', margin: 0, fontFamily: 'Syne', fontWeight: 800 }}>VittaCard Usuario</h2>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Botón de alternancia de Modo Oscuro */}
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '12px'
+            }}
+          >
+            {theme === "dark" ? "☀️ Claro" : "🌙 Oscuro"}
+          </button>
+          <span style={{ color: '#94A3B8', fontSize: '13px' }}>{perfil?.correo}</span>
+          <button 
+            onClick={handleLogout} 
+            style={{ 
+              padding: '8px 16px', 
+              borderRadius: '10px', 
+              border: 'none', 
+              background: '#EF4444', 
+              color: 'white', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              transition: 'background 0.15s' 
+            }}
+            onMouseEnter={e => e.target.style.background = '#DC2626'}
+            onMouseLeave={e => e.target.style.background = '#EF4444'}
+          >
+            Salir 🚪
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex' }}>
+        {/* Barra Lateral */}
+        <aside style={{ width: '250px', background: themeStyles.sidebarBg, minHeight: 'calc(100vh - 60px)', padding: '20px', borderRight: '1px solid ' + themeStyles.border, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {menuBtn('inicio', '🏠 Inicio')}
+          {menuBtn('membresia', '💳 Mi membresía')}
+          {menuBtn('comercios', '🏪 Comercios')}
+          {menuBtn('compras', '🛒 Compras')}
+          {menuBtn('transacciones', '💰 Transacciones')}
+          {menuBtn('beneficios', '🎁 Beneficios')}
+          {menuBtn('ajustes', '⚙️ Ajustes')}
+        </aside>
+
+        {/* Contenido Principal */}
+        <main style={{ flex: 1, padding: '24px' }}>
+          {mensajeExito && (
+            <div style={{
+              background: "#D1FAE5", color: "#065F46", padding: "12px 18px", 
+              borderRadius: "10px", marginBottom: "16px", fontWeight: 600,
+              border: "1px solid #A7F3D0"
+            }}>
+              {mensajeExito}
+            </div>
+          )}
+
+          {errorTransaccion && (
+            <div style={{
+              background: "#FEE2E2", color: "#991B1B", padding: "12px 18px", 
+              borderRadius: "10px", marginBottom: "16px", fontWeight: 600,
+              border: "1px solid #FCA5A5"
+            }}>
+              {errorTransaccion}
+            </div>
+          )}
+
+          <div className="card" style={{ background: themeStyles.cardBg, color: themeStyles.text, padding: '28px', borderRadius: '20px', transition: "background 0.2s" }}>
+            
+            {/* 🏠 SECCIÓN INICIO */}
+            {seccion === 'inicio' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                  <div>
+                    {/* Saludo con nombre real */}
+                    <h1 style={{ margin: 0, fontFamily: 'Syne', fontSize: '28px', fontWeight: 800 }}>Hola, {perfil?.nombres}</h1>
+                    <p style={{ color: themeStyles.textMuted, marginTop: '4px' }}>Bienvenido al portal de usuarios VittaCard.</p>
+                  </div>
+                  {/* Tarjeta de Cuenta */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
+                    color: 'white', padding: '16px 20px', borderRadius: '14px',
+                    minWidth: '220px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                  }}>
+                    <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94A3B8' }}>Tarjeta</span>
+                    <h4 style={{ margin: '2px 0 6px', fontFamily: 'monospace', fontSize: '15px' }}>{perfil?.cuenta || "Sin tarjeta asignada"}</h4>
+                    <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94A3B8' }}>Saldo disponible</span>
+                    <h2 style={{ margin: 0, color: '#06B6D4', fontFamily: 'Syne', fontSize: '22px', fontWeight: 800 }}>
+                      ${(perfil?.saldo || 0).toLocaleString()}
+                    </h2>
+                  </div>
+                </div>
+
+                {/* Botones de Acción */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+                  <button 
+                    onClick={() => setModalEscanearQR(true)}
+                    style={{
+                      background: '#A855F7', border: 'none', borderRadius: '12px',
+                      padding: '16px', cursor: 'pointer', fontWeight: 700, fontSize: '14px',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                      boxShadow: '0 4px 10px rgba(168,85,247,0.15)', color: 'white', transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                  >
+                    <span style={{ fontSize: '22px' }}>📷</span> Escanear QR
+                  </button>
+                  <button 
+                    onClick={() => setModalEnviar(true)}
+                    style={{
+                      background: '#06B6D4', border: 'none', borderRadius: '12px',
+                      padding: '16px', cursor: 'pointer', fontWeight: 700, fontSize: '14px',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                      boxShadow: '0 4px 10px rgba(6,182,212,0.15)', color: 'white', transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                  >
+                    <span style={{ fontSize: '22px' }}>💸</span> Enviar dinero
+                  </button>
+                  <button 
+                    onClick={() => setModalRecargar(true)}
+                    style={{
+                      background: '#10B981', border: 'none', borderRadius: '12px',
+                      padding: '16px', cursor: 'pointer', fontWeight: 700, fontSize: '14px',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                      boxShadow: '0 4px 10px rgba(16,185,129,0.15)', color: 'white', transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                  >
+                    <span style={{ fontSize: '22px' }}>📥</span> Recargar dinero
+                  </button>
+                  <button 
+                    onClick={() => setModalRecibir(true)}
+                    style={{
+                      background: '#6366F1', border: 'none', borderRadius: '12px',
+                      padding: '16px', cursor: 'pointer', fontWeight: 700, fontSize: '14px',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                      boxShadow: '0 4px 10px rgba(99,102,241,0.15)', color: 'white', transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                  >
+                    <span style={{ fontSize: '22px' }}>📲</span> Recibir dinero
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px' }}>
+                  {/* Resumen de Transferencias Recientes */}
+                  <div>
+                    <h3 style={{ fontFamily: 'Syne', fontSize: '18px', marginBottom: '14px' }}>Transferencias Recientes</h3>
+                    <div style={{ border: '1px solid ' + themeStyles.border, borderRadius: '12px', overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ background: theme === "dark" ? "#1e293b" : "#F8FAFC", borderBottom: '1px solid ' + themeStyles.border, textAlign: 'left' }}>
+                            <th style={{ padding: '10px 12px', color: themeStyles.textMuted }}>Destino / Origen</th>
+                            <th style={{ padding: '10px 12px', color: themeStyles.textMuted }}>Categoría</th>
+                            <th style={{ padding: '10px 12px', color: themeStyles.textMuted }}>Monto</th>
+                            <th style={{ padding: '10px 12px', color: themeStyles.textMuted }}>Fecha</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {transacciones.slice(0, 5).map((t, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid ' + (theme === "dark" ? "#334155" : "#F1F5F9") }}>
+                              <td style={{ padding: '10px 12px', fontWeight: 600 }}>{t.comercio}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <span style={{ background: theme === "dark" ? "rgba(255,255,255,0.06)" : "#F1F5F9", color: themeStyles.text, padding: '2px 8px', borderRadius: '12px', fontSize: '11px' }}>
+                                  {t.categoria}
+                                </span>
+                              </td>
+                              <td style={{ padding: '10px 12px', fontWeight: 700, color: t.comercio?.includes('Recarga') ? '#10B981' : themeStyles.text }}>
+                                {t.comercio?.includes('Recarga') ? '+' : '-'}${t.monto?.toLocaleString()}
+                              </td>
+                              <td style={{ padding: '10px 12px', color: themeStyles.textMuted }}>{formatDate(t.fecha)}</td>
+                            </tr>
+                          ))}
+                          {transacciones.length === 0 && (
+                            <tr>
+                              <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: themeStyles.textMuted }}>No tienes movimientos recientes</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Código QR único del Usuario */}
+                  <div style={{ 
+                    border: '1px solid ' + themeStyles.border, borderRadius: '16px', padding: '20px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    background: theme === "dark" ? "#0f172a" : "#F8FAFC"
+                  }}>
+                    <h3 style={{ fontFamily: 'Syne', fontSize: '16px', margin: '0 0 12px', textAlign: 'center' }}>Mi Código QR</h3>
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(perfil?.llave || '')}`}
+                      alt="Código QR del usuario" 
+                      style={{ border: '4px solid #fff', borderRadius: '8px', width: '130px', height: '130px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}
+                    />
+                    <p style={{ fontSize: '11px', color: themeStyles.textMuted, textAlign: 'center', marginTop: '12px', lineHeight: 1.4 }}>
+                      Escanea este código QR único desde otro dispositivo para transferir dinero usando la llave.
+                    </p>
+                    <div style={{ marginTop: '8px', background: theme === "dark" ? "#334155" : "#E2E8F0", color: themeStyles.text, padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>
+                      Llave: {perfil?.llave || "VT-000000"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 💳 SECCIÓN MI MEMBRESÍA (PLANES) */}
+            {seccion === 'membresia' && (
+              <div>
+                <div style={{ marginBottom: "28px" }}>
+                  <h1 style={{ fontFamily: "Syne", fontSize: "28px", fontWeight: 800 }}>Mi Membresía</h1>
+                  <p style={{ color: themeStyles.textMuted, marginTop: "4px" }}>Detalles de tu cuenta actual y planes de VittaCard</p>
+                </div>
+
+                {/* Resumen del plan activo */}
+                {perfil && (
+                  <div style={{ 
+                    background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)', 
+                    color: 'white', borderRadius: '16px', padding: '24px', 
+                    marginBottom: '32px', boxShadow: '0 8px 24px rgba(6,182,212,0.2)' 
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>
+                          PLAN ACTIVO
+                        </span>
+                        <h2 style={{ fontFamily: 'Syne', fontSize: '32px', fontWeight: 800, margin: '8px 0 4px' }}>
+                          VittaCard {perfil.planId?.toUpperCase()}
+                        </h2>
+                        <p style={{ margin: 0, opacity: 0.9 }}>Asociado a la cuenta: <strong>{perfil.cuenta || "Sin asignar"}</strong></p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '12px', opacity: 0.8 }}>Estado de membresía</span>
+                        <h3 style={{ margin: '4px 0 0', fontWeight: 'bold' }}>✓ ACTIVA</h3>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista de todos los planes */}
+                <h3 style={{ fontFamily: 'Syne', fontSize: '20px', marginBottom: '16px' }}>Planes Disponibles</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
+                  {planes.map(plan => {
+                    const c = planColors[plan.id] || planColors.essential;
+                    const esPlanActivo = perfil?.planId === plan.id;
+                    return (
+                      <div key={plan.id} className="card" style={{ borderTop: `4px solid ${c.accent}`, position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "320px" }}>
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                            <div>
+                              <div style={{
+                                display: "inline-block", background: c.bg, color: c.accent,
+                                padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700, marginBottom: "8px"
+                              }}>
+                                {plan.subtitulo}
+                              </div>
+                              <h2 style={{ fontFamily: "Syne", fontSize: "22px", fontWeight: 800, color: c.accent }}>{plan.nombre}</h2>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontFamily: "Syne", fontSize: "20px", fontWeight: 800, color: themeStyles.text }}>
+                                ${plan.cuota?.toLocaleString()}
+                              </div>
+                              <div style={{ fontSize: "11px", color: themeStyles.textMuted }}>/mes</div>
+                            </div>
+                          </div>
+
+                          {/* Beneficios */}
+                          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "8px", padding: 0, marginBottom: "20px" }}>
+                            {(plan.beneficios || []).map((b, i) => (
+                              <li key={i} style={{ display: "flex", gap: "8px", fontSize: "12px", color: themeStyles.text }}>
+                                <span style={{ color: c.accent, flexShrink: 0 }}>✓</span>
+                                {b}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* Botón interactivo para Adquirir Plan */}
+                        <div>
+                          <button
+                            onClick={() => handleAdquirirPlan(plan)}
+                            disabled={esPlanActivo}
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              border: esPlanActivo ? "2px solid #10B981" : `2px solid ${c.accent}`,
+                              borderRadius: "10px",
+                              background: esPlanActivo ? "#10B981" : "transparent",
+                              color: esPlanActivo ? "white" : c.accent,
+                              cursor: esPlanActivo ? "not-allowed" : "pointer",
+                              fontWeight: 600,
+                              fontSize: "13px",
+                              transition: "all 0.15s"
+                            }}
+                            onMouseEnter={e => {
+                              if (!esPlanActivo) {
+                                e.target.style.background = c.accent;
+                                e.target.style.color = "white";
+                              }
+                            }}
+                            onMouseLeave={e => {
+                              if (!esPlanActivo) {
+                                e.target.style.background = "transparent";
+                                e.target.style.color = c.accent;
+                              }
+                            }}
+                          >
+                            {esPlanActivo ? "✓ Plan Activo" : `Adquirir por $${plan.cuota?.toLocaleString()}`}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 🏪 SECCIÓN COMERCIOS */}
+            {seccion === 'comercios' && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                  <div>
+                    <h1 style={{ fontFamily: "Syne", fontSize: "28px", fontWeight: 800, margin: 0 }}>Comercios Aliados</h1>
+                    <p style={{ color: themeStyles.textMuted, marginTop: "4px", marginBottom: 0 }}>Disfruta de beneficios y descuentos especiales en las siguientes marcas asociadas a VittaCard:</p>
+                  </div>
+                  {/* Selector de Vista (Lista / Mapa) */}
+                  <div style={{ display: "flex", background: theme === "dark" ? "rgba(255,255,255,0.06)" : "#E2E8F0", padding: "4px", borderRadius: "8px", gap: "4px" }}>
+                    <button
+                      onClick={() => setVistaComercios("lista")}
+                      style={{
+                        padding: "6px 12px", borderRadius: "6px", border: "none", fontSize: "12px", fontWeight: 600, cursor: "pointer",
+                        background: vistaComercios === "lista" ? "#06B6D4" : "transparent",
+                        color: vistaComercios === "lista" ? "white" : themeStyles.text,
+                        transition: "all 0.15s"
+                      }}
+                    >
+                      📋 Lista
+                    </button>
+                    <button
+                      onClick={() => setVistaComercios("mapa")}
+                      style={{
+                        padding: "6px 12px", borderRadius: "6px", border: "none", fontSize: "12px", fontWeight: 600, cursor: "pointer",
+                        background: vistaComercios === "mapa" ? "#06B6D4" : "transparent",
+                        color: vistaComercios === "mapa" ? "white" : themeStyles.text,
+                        transition: "all 0.15s"
+                      }}
+                    >
+                      🗺️ Mapa
+                    </button>
+                  </div>
+                </div>
+
+                {vistaComercios === "mapa" ? (
+                  <MapaAliados rol="usuario" userPlan={perfil?.planId} />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {aliados.map((a, i) => {
+                      const catStyle = getCategoriaStyle(a.sector);
+                      const descuento = obtenerDescuento(perfil?.planId, a.sector);
+                      
+                      const getSectorIcon = (sector) => {
+                        const s = (sector || "").toLowerCase();
+                        switch (s) {
+                          case "salud": return <Activity className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0" />;
+                          case "deporte": return <Dumbbell className="w-5 h-5 text-violet-600 dark:text-violet-400 shrink-0" />;
+                          case "supermercado": return <ShoppingCart className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />;
+                          case "restaurante": return <Utensils className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0" />;
+                          case "farmacia": return <Pill className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />;
+                          default: return <Store className="w-5 h-5 text-slate-600 dark:text-slate-400 shrink-0" />;
+                        }
+                      };
+
+                      return (
+                        <div key={i} className="relative overflow-hidden rounded-2xl border border-slate-200/50 dark:border-slate-700/30 bg-white/70 dark:bg-slate-800/40 backdrop-blur-md p-6 flex flex-col justify-between gap-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl dark:hover:shadow-cyan-950/20">
+                          {/* Banner de Descuento (En la esquina inferior derecha) */}
+                          <div className="absolute bottom-6 right-6 bg-teal-500 text-slate-950 text-xs font-black px-3 py-1.5 rounded-lg shadow-md tracking-wider uppercase border border-teal-300/30">
+                            {descuento} OFF
+                          </div>
+
+                          <div>
+                            {/* Titular con Iconografía */}
+                            <div className="flex items-center gap-2.5 mb-2">
+                              {getSectorIcon(a.sector)}
+                              <h4 className="text-lg font-bold text-slate-900 dark:text-slate-50 tracking-tight leading-tight max-w-[70%] truncate">
+                                {a.nombre}
+                              </h4>
+                            </div>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3">NIT: {a.nit || "No registrado"}</p>
+                            
+                            {/* Badge de Categoría */}
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${catStyle.bg} ${catStyle.text}`}>
+                              {a.sector || "Otro"}
+                            </span>
+                          </div>
+
+                          {/* Ubicación y Teléfono */}
+                          <div className="flex flex-col gap-2.5 text-xs text-slate-600 dark:text-slate-400 border-t border-slate-200/50 dark:border-slate-700/30 pt-4 pb-2">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span className="truncate">{a.ubicacion || "No disponible"}</span>
+                            </div>
+                            {a.telefono && (
+                              <div className="flex items-center gap-2">
+                                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>{a.telefono}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 🛒 SECCIÓN COMPRAS */}
+            {seccion === 'compras' && (
+              <div>
+                <h2>Compras</h2>
+                <p style={{ color: themeStyles.textMuted }}>Total de compras registradas: {transacciones.length}</p>
+                <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {transacciones.map((t, i) => (
+                    <div key={i} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <h4 style={{ margin: 0 }}>{t.comercio}</h4>
+                        <span style={{ fontSize: '11px', color: themeStyles.textMuted }}>{formatDate(t.fecha)}</span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '16px' }}>${t.monto?.toLocaleString()}</span>
+                        <div style={{ fontSize: '11px', color: '#10B981' }}>✓ Completado</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 💰 SECCIÓN TRANSACCIONES */}
+            {seccion === 'transacciones' && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                  <div>
+                    <h1 style={{ fontFamily: "Syne", fontSize: "28px", fontWeight: 800 }}>Historial de Transacciones</h1>
+                    <p style={{ color: themeStyles.textMuted, marginTop: "4px" }}>Revisa todos tus movimientos y estadísticas personales</p>
+                  </div>
+                </div>
+
+                {/* Estadísticas Personales */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "24px" }}>
+                  <div className="card" style={{ borderTop: "4px solid #00B4B4" }}>
+                    <div style={{ fontFamily: "Syne", fontSize: "26px", fontWeight: 800 }}>{transacciones.length}</div>
+                    <div style={{ fontSize: "12px", color: themeStyles.textMuted, marginTop: "4px" }}>Total transacciones</div>
+                  </div>
+                  <div className="card" style={{ borderTop: "4px solid #7C3AED" }}>
+                    <div style={{ fontFamily: "Syne", fontSize: "26px", fontWeight: 800 }}>${userVolumenTotal.toLocaleString()}</div>
+                    <div style={{ fontSize: "12px", color: themeStyles.textMuted, marginTop: "4px" }}>Volumen total procesado</div>
+                  </div>
+                  <div className="card" style={{ borderTop: "4px solid #F59E0B" }}>
+                    <div style={{ fontFamily: "Syne", fontSize: "26px", fontWeight: 800 }}>
+                      ${userPromedioTx.toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: "12px", color: themeStyles.textMuted, marginTop: "4px" }}>Promedio por transacción</div>
+                  </div>
+                </div>
+
+                {/* Buscador */}
+                <div className="card" style={{ marginBottom: "20px", padding: "16px" }}>
+                  <input
+                    className="input-field"
+                    placeholder="🔍  Buscar por comercio, categoría..."
+                    value={searchTx}
+                    onChange={e => setSearchTx(e.target.value)}
+                    style={{ maxWidth: "400px" }}
+                  />
+                </div>
+
+                {/* Tabla de Historial */}
+                <div className="card">
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: theme === "dark" ? "#1e293b" : "#F3F4F6", borderBottom: "2px solid " + themeStyles.border }}>
+                        {["Destino / Origen", "Categoría", "Monto", "Fecha", "Estado"].map(h => (
+                          <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: "12px", color: themeStyles.textMuted, fontWeight: 700 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTxs.map((tx, i) => (
+                        <tr key={i} style={{ borderBottom: "1px solid " + (theme === "dark" ? "#334155" : "#F9FAFB") }}>
+                          <td style={{ padding: "14px", fontWeight: 600, fontSize: "13px" }}>{tx.comercio}</td>
+                          <td style={{ padding: "14px" }}>
+                            <span style={{ background: theme === "dark" ? "rgba(255,255,255,0.06)" : "#E0F7F7", color: theme === "dark" ? "#fff" : "#008A8A", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: 600 }}>
+                              {tx.categoria}
+                            </span>
+                          </td>
+                          <td style={{ padding: "14px", fontFamily: "Syne", fontWeight: 800, color: tx.comercio?.includes('Recarga') ? '#10B981' : themeStyles.text }}>
+                            {tx.comercio?.includes('Recarga') ? '+' : '-'}${tx.monto?.toLocaleString()}
+                          </td>
+                          <td style={{ padding: "14px", fontSize: "12px", color: themeStyles.textMuted }}>{formatDate(tx.fecha)}</td>
+                          <td style={{ padding: "14px" }}>
+                            <span style={{ background: "#D1FAE5", color: "#059669", padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: 600 }}>
+                              ✓ {tx.estado || "completada"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filteredTxs.length === 0 && (
+                    <p style={{ textAlign: "center", color: themeStyles.textMuted, padding: "32px", fontSize: "14px" }}>
+                      No se encontraron transacciones en el historial.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 🎁 SECCIÓN BENEFICIOS */}
+            {seccion === 'beneficios' && (
+              <div>
+                <h2>Beneficios VittaCard</h2>
+                <p style={{ color: themeStyles.textMuted }}>Disfruta de las ventajas de tu plan actual:</p>
+                <ul style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {planes.find(p => p.id === perfil?.planId)?.beneficios?.map((b, i) => (
+                    <li key={i} style={{ padding: '12px 16px', background: theme === "dark" ? "#0f172a" : "#F8FAFC", borderRadius: '10px', borderLeft: '3px solid #06B6D4', listStyleType: 'none' }}>
+                      ✨ {b}
+                    </li>
+                  )) || <li>No hay beneficios específicos de tu plan cargados.</li>}
+                </ul>
+              </div>
+            )}
+
+            {/* ⚙️ SECCIÓN AJUSTES */}
+            {seccion === 'ajustes' && (
+              <div>
+                <h1 style={{ fontFamily: "Syne", fontSize: "26px", marginBottom: "10px" }}>Ajustes de Perfil</h1>
+                <p style={{ color: themeStyles.textMuted, marginBottom: "20px" }}>Actualiza tus datos personales de seguridad</p>
+                
+                <form onSubmit={handleGuardarAjustes} style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '500px', marginTop: '20px' }}>
+                  {msgAjustes && (
+                    <div style={{
+                      padding: "10px 14px",
+                      borderRadius: "7px",
+                      background: "rgba(16,185,129,0.15)",
+                      border: "1px solid rgba(16,185,129,0.35)",
+                      color: "#34D399",
+                      fontSize: "13px",
+                    }}>
+                      {msgAjustes}
+                    </div>
+                  )}
+                  {errorAjustes && (
+                    <div style={{
+                      padding: "10px 14px",
+                      borderRadius: "7px",
+                      background: "rgba(220,38,38,0.15)",
+                      border: "1px solid rgba(220,38,38,0.35)",
+                      color: "#FCA5A5",
+                      fontSize: "13px",
+                    }}>
+                      {errorAjustes}
+                    </div>
+                  )}
+                  <div>
+                    <label style={{ fontSize: '12px', color: themeStyles.textMuted, fontWeight: 600, display: 'block', marginBottom: '6px' }}>Teléfono Celular</label>
+                    <input 
+                      className="input-field" 
+                      value={editTelefono} 
+                      onChange={e => setEditTelefono(e.target.value.replace(/\D/g, "").slice(0, 10))} 
+                      required
+                      style={{ background: themeStyles.cardBg, color: themeStyles.text, borderColor: themeStyles.border }} 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: themeStyles.textMuted, fontWeight: 600, display: 'block', marginBottom: '6px' }}>Nueva Contraseña (dejar vacío si no deseas cambiarla)</label>
+                    <div style={{ position: "relative", width: "100%" }}>
+                      <input 
+                        className="input-field" 
+                        type={verContrasena ? "text" : "password"}
+                        value={nuevaContrasena} 
+                        onChange={e => setNuevaContrasena(e.target.value)} 
+                        placeholder="Mínimo 6 caracteres"
+                        style={{ background: themeStyles.cardBg, color: themeStyles.text, borderColor: themeStyles.border, paddingRight: "40px", width: "100%" }} 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVerContrasena(!verContrasena)}
+                        style={{
+                          position: "absolute",
+                          right: "12px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "none",
+                          border: "none",
+                          color: themeStyles.textMuted,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: 0,
+                          outline: "none",
+                          transition: "color 0.2s",
+                          zIndex: 5,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = theme === "dark" ? "#f8fafc" : "#1E293B"}
+                        onMouseLeave={e => e.currentTarget.style.color = themeStyles.textMuted}
+                      >
+                        {verContrasena ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={guardandoAjustes}
+                    style={{
+                      background: '#06B6D4',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px 20px',
+                      cursor: guardandoAjustes ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                      fontSize: '13.5px',
+                      alignSelf: 'flex-start',
+                      transition: 'background 0.15s',
+                      opacity: guardandoAjustes ? 0.7 : 1,
+                    }}
+                    onMouseEnter={e => { if(!guardandoAjustes) e.target.style.background = '#0891B2'; }}
+                    onMouseLeave={e => { if(!guardandoAjustes) e.target.style.background = '#06B6D4'; }}
+                  >
+                    {guardandoAjustes ? (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                          <circle cx="12" cy="12" r="10" stroke="rgba(255, 255, 255, 0.2)" strokeDasharray="31.4" />
+                          <path d="M12 2a10 10 0 0 1 10 10" />
+                        </svg>
+                        <span>Guardando...</span>
+                      </div>
+                    ) : (
+                      "Guardar Ajustes"
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* ── MODAL: ENVIAR DINERO (CON BUSCADOR DINÁMICO) ── */}
+      {modalEnviar && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200
+        }}>
+          <div className="card" style={{ width: "480px", background: themeStyles.cardBg, color: themeStyles.text }}>
+            <h3 style={{ fontFamily: "Syne", fontSize: "18px", marginBottom: "20px" }}>Enviar Dinero</h3>
+            <form onSubmit={handleEnviarSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              
+              {/* Buscador de Destinatario */}
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: 600, display: "block", marginBottom: "5px" }}>
+                  Destinatario (Buscar por Correo o Llave única VT-XXXXXX)
+                </label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    className="input-field"
+                    value={searchQuery}
+                    onChange={e => {
+                      setSearchQuery(e.target.value);
+                      setDestEncontrado(null);
+                      setSearchError("");
+                    }}
+                    placeholder="Ej: VT-A1B2C3 o correo@ejemplo.com"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={handleBuscarDestinatario}
+                    disabled={buscando}
+                    style={{
+                      background: "#06B6D4", color: "white", border: "none", borderRadius: "6px",
+                      padding: "10px 16px", cursor: "pointer", fontWeight: 600
+                    }}
+                  >
+                    {buscando ? "..." : "Buscar"}
+                  </button>
+                </div>
+                {searchError && <p style={{ color: "#EF4444", fontSize: "12px", marginTop: "4px" }}>{searchError}</p>}
+                
+                {destEncontrado && (
+                  <div style={{
+                    marginTop: "10px", padding: "10px", borderRadius: "8px",
+                    background: theme === "dark" ? "rgba(255,255,255,0.05)" : "#E0F7F7",
+                    border: "1px solid " + (theme === "dark" ? "#334155" : "#00B4B4"),
+                    color: theme === "dark" ? "#fff" : "#008A8A"
+                  }}>
+                    <p style={{ margin: 0, fontSize: "13px" }}>
+                      <strong>Destinatario encontrado:</strong> {destEncontrado.nombres || destEncontrado.nombre}
+                    </p>
+                    <p style={{ margin: "2px 0 0", fontSize: "11px", opacity: 0.8 }}>
+                      Tipo: {destEncontrado.tipo === "usuario" ? "Usuario VittaCard" : "Comercio Aliado"}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: 600, display: "block", marginBottom: "5px" }}>Monto ($)</label>
+                <input 
+                  className="input-field" 
+                  type="number" 
+                  value={formEnviar.monto} 
+                  onChange={e => setFormEnviar({ ...formEnviar, monto: e.target.value })} 
+                  required 
+                  min="1" 
+                  max={perfil?.saldo || 0}
+                  placeholder={`Máximo disponible: $${(perfil?.saldo || 0).toLocaleString()}`}
+                />
+              </div>
+              
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: 600, display: "block", marginBottom: "5px" }}>Categoría</label>
+                <select 
+                  className="input-field" 
+                  value={formEnviar.categoria} 
+                  onChange={e => setFormEnviar({ ...formEnviar, categoria: e.target.value })}
+                >
+                  <option value="Salud">Salud</option>
+                  <option value="Deporte">Deporte</option>
+                  <option value="Alimentos">Alimentos</option>
+                  <option value="Farmacia">Farmacia</option>
+                  <option value="Entretenimiento">Entretenimiento</option>
+                  <option value="Transporte">Transporte</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                <button 
+                  type="submit" 
+                  disabled={!destEncontrado || enviandoDinero}
+                  className="btn-primary" 
+                  style={{ 
+                    background: '#06B6D4',
+                    opacity: (destEncontrado && !enviandoDinero) ? 1 : 0.6,
+                    cursor: (destEncontrado && !enviandoDinero) ? "pointer" : "not-allowed"
+                  }}
+                >
+                  {enviandoDinero ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                      <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10" stroke="rgba(255, 255, 255, 0.2)" strokeDasharray="31.4" />
+                        <path d="M12 2a10 10 0 0 1 10 10" />
+                      </svg>
+                      <span>Enviando...</span>
+                    </div>
+                  ) : (
+                    "Enviar dinero"
+                  )}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setModalEnviar(false);
+                    setSearchQuery("");
+                    setDestEncontrado(null);
+                    setSearchError("");
+                  }} 
+                  style={{
+                    flex: 1, padding: "12px", border: "2px solid #E5E7EB", borderRadius: "10px",
+                    background: "white", cursor: "pointer", fontWeight: 600, color: "#6B7280"
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: RECARGAR DINERO ── */}
+      {modalRecargar && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200
+        }}>
+          <div className="card" style={{ width: "480px", background: themeStyles.cardBg, color: themeStyles.text }}>
+            <h3 style={{ fontFamily: "Syne", fontSize: "18px", marginBottom: "20px" }}>Recargar Dinero</h3>
+            <form onSubmit={handleRecargarSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: 600, display: "block", marginBottom: "5px" }}>Tarjeta de Origen (Simulación PSE / Débito)</label>
+                <input 
+                  className="input-field" 
+                  value={formRecargar.tarjeta} 
+                  onChange={e => setFormRecargar({ ...formRecargar, tarjeta: e.target.value })} 
+                  required 
+                  placeholder="5200-XXXX-XXXX-XXXX"
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: 600, display: "block", marginBottom: "5px" }}>Monto a Recargar ($)</label>
+                <input 
+                  className="input-field" 
+                  type="number" 
+                  value={formRecargar.monto} 
+                  onChange={e => setFormRecargar({ ...formRecargar, monto: e.target.value })} 
+                  required 
+                  min="1000" 
+                  placeholder="Ej: 50000"
+                />
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                <button 
+                  type="submit" 
+                  disabled={procesandoPSE}
+                  className="btn-primary" 
+                  style={{ 
+                    background: '#10B981',
+                    opacity: procesandoPSE ? 0.7 : 1,
+                    cursor: procesandoPSE ? "not-allowed" : "pointer"
+                  }}
+                >
+                  {procesandoPSE ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                      <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10" stroke="rgba(255, 255, 255, 0.2)" strokeDasharray="31.4" />
+                        <path d="M12 2a10 10 0 0 1 10 10" />
+                      </svg>
+                      <span>Procesando...</span>
+                    </div>
+                  ) : (
+                    "Recargar"
+                  )}
+                </button>
+                <button type="button" onClick={() => setModalRecargar(false)} style={{
+                  flex: 1, padding: "12px", border: "2px solid #E5E7EB", borderRadius: "10px",
+                  background: "white", cursor: "pointer", fontWeight: 600, color: "#6B7280"
+                }}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: RECIBIR DINERO (QR CON LLAVE) ── */}
+      {modalRecibir && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200
+        }}>
+          <div className="card" style={{ width: "400px", textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', background: themeStyles.cardBg, color: themeStyles.text }}>
+            <h3 style={{ fontFamily: "Syne", fontSize: "18px", marginBottom: "16px" }}>Recibir Dinero</h3>
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(perfil?.llave || '')}`}
+              alt="Código QR del usuario" 
+              style={{ border: '4px solid #fff', borderRadius: '8px', width: '180px', height: '180px', boxShadow: '0 2px 15px rgba(0,0,0,0.1)' }}
+            />
+            <h4 style={{ margin: '14px 0 4px', fontSize: '15px' }}>{perfil?.nombres}</h4>
+            <p style={{ fontSize: '12px', color: themeStyles.textMuted, margin: '0 0 20px', lineHeight: 1.4 }}>
+              Muestra este código para recibir transferencias de otros usuarios de VittaCard.<br />
+              <strong>Llave única: {perfil?.llave}</strong>
+            </p>
+            <button 
+              type="button" 
+              onClick={() => setModalRecibir(false)} 
+              className="btn-primary"
+              style={{ background: '#6366F1' }}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: ESCANEAR COBRO QR (GLASSMORPHIC) ── */}
+      {modalEscanearQR && (
+        <div style={{
+          position: "fixed", inset: 0, 
+          background: "rgba(15, 23, 42, 0.75)",
+          backdropFilter: "blur(12px)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
+          padding: "20px"
+        }}>
+          <div className="card" style={{ 
+            width: "100%", maxWidth: "450px", 
+            background: theme === "dark" ? "rgba(30, 41, 59, 0.75)" : "rgba(255, 255, 255, 0.85)", 
+            color: themeStyles.text,
+            border: "1px solid " + (theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"),
+            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.3)",
+            borderRadius: "24px",
+            padding: "30px",
+            position: "relative"
+          }}>
+            <button 
+              onClick={() => {
+                setModalEscanearQR(false);
+                setConfirmingPayment(false);
+                setIntentIdQR("");
+                setIntentData(null);
+                setScanError("");
+              }}
+              style={{
+                position: "absolute", right: "20px", top: "20px",
+                background: "transparent", border: "none", color: themeStyles.textMuted,
+                fontSize: "20px", cursor: "pointer", fontWeight: "bold"
+              }}
+            >
+              ✕
+            </button>
+
+            {!confirmingPayment ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center" }}>
+                <div style={{ textAlign: "center" }}>
+                  <h3 style={{ fontFamily: "Syne", fontSize: "22px", fontWeight: 800, margin: 0 }}>Escanear Código QR</h3>
+                  <p style={{ color: themeStyles.textMuted, fontSize: "13px", marginTop: "6px" }}>
+                    Apunta tu cámara al código QR de cobro generado por el comercio.
+                  </p>
+                </div>
+
+                {/* Contenedor de cámara */}
+                <div style={{ 
+                  width: "100%", height: "260px", background: "#000", 
+                  borderRadius: "16px", overflow: "hidden", display: "flex", 
+                  alignItems: "center", justifyContent: "center", position: "relative",
+                  border: "2px solid " + (theme === "dark" ? "#334155" : "#E2E8F0")
+                }}>
+                  <div id="reader" style={{ width: "100%", height: "100%" }}></div>
+                  {procesandoPagoQR && (
+                    <div style={{
+                      position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",
+                      display: "flex", alignItems: "center", justifyContent: "center"
+                    }}>
+                      <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent"></div>
+                    </div>
+                  )}
+                </div>
+
+                {scanError && (
+                  <div style={{ 
+                    color: "#EF4444", fontSize: "12.5px", textAlign: "center", 
+                    background: "rgba(239, 68, 68, 0.1)", padding: "10px", 
+                    borderRadius: "8px", width: "100%", border: "1px solid rgba(239, 68, 68, 0.2)"
+                  }}>
+                    {scanError}
+                  </div>
+                )}
+
+                {/* MODO DEV - Simulación manual */}
+                <div style={{ 
+                  width: "100%", borderTop: "1px solid " + themeStyles.border, 
+                  paddingTop: "16px", marginTop: "8px" 
+                }}>
+                  <div style={{ 
+                    display: "flex", alignItems: "center", justifyBetween: "space-between", 
+                    marginBottom: "8px", justifyContent: "space-between"
+                  }}>
+                    <span style={{ 
+                      fontSize: "11px", fontWeight: 800, color: "#A855F7", 
+                      background: "rgba(168, 85, 247, 0.15)", padding: "2px 8px", 
+                      borderRadius: "12px", letterSpacing: "0.5px" 
+                    }}>
+                      MODO DEV 🛠️
+                    </span>
+                    <span style={{ fontSize: "11px", color: themeStyles.textMuted }}>Ingresar ID manualmente</span>
+                  </div>
+                  
+                  <div style={{ display: "flex", gap: "8px", width: "100%" }}>
+                    <input
+                      className="input-field"
+                      placeholder="Pegar ID del Intento de Pago..."
+                      value={intentIdQR}
+                      onChange={e => setIntentIdQR(e.target.value)}
+                      style={{ fontSize: "13px", padding: "10px", flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handlePaymentScanned(intentIdQR)}
+                      style={{
+                        background: "#A855F7", color: "white", border: "none", 
+                        borderRadius: "10px", padding: "10px 16px", cursor: "pointer", 
+                        fontWeight: 600, fontSize: "13px",
+                        boxShadow: "0 4px 10px rgba(168, 85, 247, 0.2)"
+                      }}
+                    >
+                      Validar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Vista de Confirmación del Pago
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <div style={{ textAlign: "center" }}>
+                  <span style={{
+                    background: "rgba(168, 85, 247, 0.15)", color: "#A855F7",
+                    padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: 700
+                  }}>
+                    CONFIRMAR TRANSACCIÓN
+                  </span>
+                  <h3 style={{ fontFamily: "Syne", fontSize: "24px", fontWeight: 800, margin: "12px 0 0" }}>
+                    Detalle del Pago
+                  </h3>
+                </div>
+
+                <div style={{
+                  background: theme === "dark" ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                  borderRadius: "16px", padding: "20px", border: "1px solid " + themeStyles.border,
+                  display: "flex", flexDirection: "column", gap: "12px"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: themeStyles.textMuted, fontSize: "13px" }}>Comercio:</span>
+                    <strong style={{ fontSize: "14px" }}>{intentData.comercioNombre}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: themeStyles.textMuted, fontSize: "13px" }}>Sector:</span>
+                    <span style={{ 
+                      fontSize: "12px", fontWeight: 600, color: "#06B6D4",
+                      background: "rgba(6, 182, 212, 0.1)", padding: "2px 8px", borderRadius: "12px"
+                    }}>
+                      {intentData.comercioSector || "Otro"}
+                    </span>
+                  </div>
+                  <hr style={{ border: 0, borderTop: "1px dashed " + themeStyles.border, margin: "4px 0" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: themeStyles.textMuted, fontSize: "13px" }}>Monto original:</span>
+                    <span style={{ fontSize: "14px", textDecoration: "line-through", opacity: 0.7 }}>
+                      ${intentData.monto?.toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: themeStyles.textMuted, fontSize: "13px" }}>Descuento ({calcularMontoFinal(intentData.monto, perfil.planId, intentData.comercioSector).descText} por tu plan):</span>
+                    <span style={{ fontSize: "13px", color: "#10B981", fontWeight: "bold" }}>
+                      -${calcularMontoFinal(intentData.monto, perfil.planId, intentData.comercioSector).descuento?.toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: "6px" }}>
+                    <span style={{ color: themeStyles.text, fontWeight: "bold", fontSize: "14px" }}>Total a pagar:</span>
+                    <strong style={{ fontSize: "24px", color: "#06B6D4", fontFamily: "Syne" }}>
+                      ${calcularMontoFinal(intentData.monto, perfil.planId, intentData.comercioSector).montoFinal?.toLocaleString()}
+                    </strong>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+                  <button
+                    onClick={handleConfirmarPagoQR}
+                    disabled={procesandoPagoQR}
+                    style={{
+                      flex: 2, background: "#06B6D4", color: "white", border: "none",
+                      borderRadius: "12px", padding: "14px", cursor: "pointer",
+                      fontWeight: 700, fontSize: "14px", display: "flex", 
+                      alignItems: "center", justifyContent: "center", gap: "8px",
+                      boxShadow: "0 4px 15px rgba(6, 182, 212, 0.25)"
+                    }}
+                  >
+                    {procesandoPagoQR ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-t-white border-r-transparent border-b-transparent border-l-transparent"></div>
+                    ) : (
+                      "Confirmar Pago 💳"
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmingPayment(false);
+                      setIntentIdQR("");
+                      setIntentData(null);
+                    }}
+                    disabled={procesandoPagoQR}
+                    style={{
+                      flex: 1, background: "transparent", 
+                      border: "2px solid " + (theme === "dark" ? "#334155" : "#E2E8F0"),
+                      borderRadius: "12px", padding: "14px", cursor: "pointer",
+                      color: themeStyles.text, fontWeight: 600, fontSize: "14px"
+                    }}
+                  >
+                    Atrás
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
