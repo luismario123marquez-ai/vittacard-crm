@@ -12,6 +12,7 @@ import Transacciones from "./pages/Transacciones";
 import VittaData from "./pages/VittaData";
 import UsuarioDashboard from "./pages/usuario/UsuarioDashboard";
 import AliadoDashboard from "./pages/aliado/AliadoDashboard";
+import MisTarjetas from "./pages/usuario/MisTarjetas";
 
 const RutaPrivada = ({ children }) => {
   const { currentUser } = useAuth();
@@ -29,6 +30,7 @@ export default function App() {
           
           {/* Portal del Usuario */}
           <Route path="/usuario/dashboard" element={<RutaPrivada><UsuarioDashboard /></RutaPrivada>} />
+          <Route path="/usuario/tarjetas" element={<RutaPrivada><MisTarjetas /></RutaPrivada>} />
           
           {/* Portal del Aliado Comercial */}
           <Route path="/aliado/dashboard" element={<RutaPrivada><AliadoDashboard /></RutaPrivada>} />

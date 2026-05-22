@@ -6,7 +6,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, onSnapshot } from "firebase/firestore";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -67,6 +67,33 @@ export const AuthProvider = ({ children }) => {
     });
     return cancelar;
   }, []);
+
+  // ─── Blindaje de Seguridad: listener onSnapshot para forzar logout si el usuario es desactivado ───
+  useEffect(() => {
+    let unsubscribeUser = null;
+    if (currentUser && userRole !== "admin") {
+      const q = query(collection(db, "usuarios"), where("correo", "==", currentUser.email));
+      unsubscribeUser = onSnapshot(q, (snapshot) => {
+        if (!snapshot.empty) {
+          const uDoc = snapshot.docs[0].data();
+          const estaInactivo = uDoc.activo === false || 
+                               uDoc.activo === "Inactivo" || 
+                               uDoc.activo === "Bloqueado" ||
+                               uDoc.estado === "Inactivo" || 
+                               uDoc.estado === "Bloqueado";
+          if (estaInactivo) {
+            console.warn("Usuario suspendido o inactivo detectado. Forzando cierre de sesión.");
+            signOut(auth);
+          }
+        }
+      }, (error) => {
+        console.error("Error en listener de seguridad de usuario:", error);
+      });
+    }
+    return () => {
+      if (unsubscribeUser) unsubscribeUser();
+    };
+  }, [currentUser, userRole]);
 
   return (
     <AuthContext.Provider value={{ currentUser, userRole, register, login, logout, loading, theme, toggleTheme }}>

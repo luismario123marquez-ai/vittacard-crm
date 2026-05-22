@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { auth, db } from "../../firebase/config";
-import { collection, getDocs, query, where, doc, updateDoc, addDoc, getDoc, deleteDoc, runTransaction } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
+import { collection, getDocs, query, where, doc, updateDoc, addDoc, getDoc, deleteDoc, runTransaction, onSnapshot } from "firebase/firestore";
+import { useNavigate, useLocation } from "react-router-dom";
 import { updatePassword } from "firebase/auth";
 import MapaAliados from "../../components/MapaAliados";
-import { Store, Activity, Dumbbell, ShoppingCart, Utensils, Pill, MapPin, Phone, CheckCircle } from "lucide-react";
+import { Store, Activity, Dumbbell, ShoppingCart, Utensils, Pill, MapPin, Phone, CheckCircle, User, FileText, Shield, Sliders, Upload, QrCode, Send, Wallet, ArrowDownToLine, Copy, Eye, EyeOff } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 
 export default function UsuarioDashboard() {
   const { currentUser, logout, theme, toggleTheme } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [perfil, setPerfil] = useState(null);
   const [perfilId, setPerfilId] = useState(null);
+  const [tarjeta, setTarjeta] = useState(null);
+  const [verTarjeta, setVerTarjeta] = useState(false);
   const [transacciones, setTransacciones] = useState([]);
   const [planes, setPlanes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -21,13 +24,37 @@ export default function UsuarioDashboard() {
   const [loading, setLoading] = useState(true);
   const [seccion, setSeccion] = useState("membresia"); // Ver planes inmediatamente al iniciar sesión
 
+  useEffect(() => {
+    if (location.state?.seccion) {
+      setSeccion(location.state.seccion);
+    }
+  }, [location.state]);
+
+  // Listener en tiempo real para la tarjeta virtual del usuario
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(collection(db, "tarjetas"), where("correo", "==", currentUser.email));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        setTarjeta({ id: snap.docs[0].id, ...snap.docs[0].data() });
+      } else {
+        setTarjeta(null);
+      }
+    }, (err) => {
+      console.error("Error al escuchar la tarjeta en el dashboard:", err);
+    });
+    return () => unsubscribe();
+  }, [currentUser]);
+
   // Estados para Ajustes de Perfil (Fase 3)
+  const [subTab, setSubTab] = useState("perfil");
   const [editTelefono, setEditTelefono] = useState("");
   const [nuevaContrasena, setNuevaContrasena] = useState("");
   const [msgAjustes, setMsgAjustes] = useState("");
   const [errorAjustes, setErrorAjustes] = useState("");
   const [verContrasena, setVerContrasena] = useState(false);
   const [vistaComercios, setVistaComercios] = useState("lista");
+  const [copiado, setCopiado] = useState(false);
 
   // Estados de modales
   const [modalEnviar, setModalEnviar] = useState(false);
@@ -746,7 +773,13 @@ export default function UsuarioDashboard() {
   // Botón lateral estilizado
   const menuBtn = (id, label) => (
     <button
-      onClick={() => setSeccion(id)}
+      onClick={() => {
+        if (id === 'tarjetas') {
+          navigate('/usuario/tarjetas');
+        } else {
+          setSeccion(id);
+        }
+      }}
       style={{
         background: seccion === id ? '#06B6D4' : themeStyles.sidebarBg,
         color: seccion === id ? '#fff' : themeStyles.text,
@@ -843,6 +876,7 @@ export default function UsuarioDashboard() {
         <aside style={{ width: '250px', background: themeStyles.sidebarBg, minHeight: 'calc(100vh - 60px)', padding: '20px', borderRight: '1px solid ' + themeStyles.border, display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {menuBtn('inicio', '🏠 Inicio')}
           {menuBtn('membresia', '💳 Mi membresía')}
+          {menuBtn('tarjetas', '🪪 Mis Tarjetas')}
           {menuBtn('comercios', '🏪 Comercios')}
           {menuBtn('compras', '🛒 Compras')}
           {menuBtn('transacciones', '💰 Transacciones')}
@@ -877,117 +911,160 @@ export default function UsuarioDashboard() {
             {/* 🏠 SECCIÓN INICIO */}
             {seccion === 'inicio' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-slate-100 dark:border-slate-800/80 pb-6">
                   <div>
                     {/* Saludo con nombre real */}
-                    <h1 style={{ margin: 0, fontFamily: 'Syne', fontSize: '28px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <h1 className="text-3xl font-black font-['Syne'] text-slate-900 dark:text-white leading-tight flex items-center gap-3.5 flex-wrap">
                       Hola, {perfil?.nombres} {getPlanBadge(perfil?.planId)}
                     </h1>
-                    <p style={{ color: themeStyles.textMuted, marginTop: '4px' }}>Bienvenido al portal de usuarios VittaCard.</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Bienvenido al portal de usuarios VittaCard.</p>
                   </div>
                   {/* Tarjeta de Cuenta */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
-                    color: 'white', padding: '16px 20px', borderRadius: '14px',
-                    minWidth: '220px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-                  }}>
-                    <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94A3B8' }}>Tarjeta</span>
-                    <h4 style={{ margin: '2px 0 6px', fontFamily: 'monospace', fontSize: '15px' }}>{perfil?.cuenta || "Sin tarjeta asignada"}</h4>
-                    <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94A3B8' }}>Saldo disponible</span>
-                    <h2 style={{ margin: 0, color: '#06B6D4', fontFamily: 'Syne', fontSize: '22px', fontWeight: 800 }}>
+                  <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white p-6 rounded-2xl min-w-[250px] shadow-lg border border-slate-850 relative">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Tarjeta</span>
+                    <div className="flex items-center justify-between mt-1 mb-2">
+                      <h4 className="text-sm font-mono text-slate-300 tracking-wider m-0">
+                        {tarjeta 
+                          ? (verTarjeta 
+                              ? `${tarjeta.numero.slice(0, 4)} ${tarjeta.numero.slice(4, 8)} ${tarjeta.numero.slice(8, 12)} ${tarjeta.numero.slice(12, 16)}` 
+                              : `${tarjeta.numero.slice(0, 4)} **** **** ${tarjeta.numero.slice(-4)}`)
+                          : perfil?.cuenta 
+                            ? (perfil.cuenta.includes("X") || perfil.cuenta.includes("*") 
+                                ? perfil.cuenta 
+                                : `${perfil.cuenta.replace(/-/g, '').slice(0, 4)} **** **** ${perfil.cuenta.replace(/-/g, '').slice(-4)}`) 
+                            : "Sin tarjeta asignada"}
+                      </h4>
+                      {(tarjeta || (perfil?.cuenta && !(perfil.cuenta.includes("X") || perfil.cuenta.includes("*")))) && (
+                        <button
+                          onClick={() => {
+                            if (!verTarjeta) {
+                              setVerTarjeta(true);
+                              setTimeout(() => setVerTarjeta(false), 10000);
+                            } else {
+                              setVerTarjeta(false);
+                            }
+                          }}
+                          className="text-slate-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-all outline-none cursor-pointer"
+                          title={verTarjeta ? "Ocultar" : "Mostrar (10s)"}
+                        >
+                          {verTarjeta ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      )}
+                    </div>
+                    {tarjeta && (
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 mb-3">
+                        <div>
+                          <span>Vence: </span>
+                          <span className="text-slate-200 font-semibold">{tarjeta.vencimiento}</span>
+                        </div>
+                        <div>
+                          <span>CVV: </span>
+                          <span className="text-slate-200 font-semibold">{verTarjeta ? tarjeta.cvv : "***"}</span>
+                        </div>
+                      </div>
+                    )}
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Saldo disponible</span>
+                    <h2 className="text-2xl font-black text-cyan-400 font-['Syne'] mt-1">
                       ${(perfil?.saldo || 0).toLocaleString()}
                     </h2>
                   </div>
                 </div>
 
-                {/* Botones de Acción */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+                {/* Botones de Acción Rápida */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   <button 
                     onClick={() => setModalEscanearQR(true)}
-                    style={{
-                      background: '#A855F7', border: 'none', borderRadius: '12px',
-                      padding: '16px', cursor: 'pointer', fontWeight: 700, fontSize: '14px',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-                      boxShadow: '0 4px 10px rgba(168,85,247,0.15)', color: 'white', transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
-                    onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                    className="flex flex-col items-center gap-3.5 p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-all duration-300 rounded-2xl cursor-pointer text-slate-800 dark:text-slate-200 outline-none w-full"
                   >
-                    <span style={{ fontSize: '22px' }}>📷</span> Escanear QR
+                    <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400 flex items-center justify-center transition-transform duration-250 hover:scale-105">
+                      <QrCode className="w-5.5 h-5.5" />
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 mt-3">Escanear QR</span>
                   </button>
+
                   <button 
                     onClick={() => setModalEnviar(true)}
-                    style={{
-                      background: '#06B6D4', border: 'none', borderRadius: '12px',
-                      padding: '16px', cursor: 'pointer', fontWeight: 700, fontSize: '14px',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-                      boxShadow: '0 4px 10px rgba(6,182,212,0.15)', color: 'white', transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
-                    onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                    className="flex flex-col items-center gap-3.5 p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-all duration-300 rounded-2xl cursor-pointer text-slate-800 dark:text-slate-200 outline-none w-full"
                   >
-                    <span style={{ fontSize: '22px' }}>💸</span> Enviar dinero
+                    <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 flex items-center justify-center transition-transform duration-250 hover:scale-105">
+                      <Send className="w-5 h-5 -mr-0.5" />
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 mt-3">Enviar dinero</span>
                   </button>
+
                   <button 
                     onClick={() => setModalRecargar(true)}
-                    style={{
-                      background: '#10B981', border: 'none', borderRadius: '12px',
-                      padding: '16px', cursor: 'pointer', fontWeight: 700, fontSize: '14px',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-                      boxShadow: '0 4px 10px rgba(16,185,129,0.15)', color: 'white', transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
-                    onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                    className="flex flex-col items-center gap-3.5 p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-all duration-300 rounded-2xl cursor-pointer text-slate-800 dark:text-slate-200 outline-none w-full"
                   >
-                    <span style={{ fontSize: '22px' }}>📥</span> Recargar dinero
+                    <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center transition-transform duration-250 hover:scale-105">
+                      <Wallet className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 mt-3">Recargar dinero</span>
                   </button>
+
                   <button 
                     onClick={() => setModalRecibir(true)}
-                    style={{
-                      background: '#6366F1', border: 'none', borderRadius: '12px',
-                      padding: '16px', cursor: 'pointer', fontWeight: 700, fontSize: '14px',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-                      boxShadow: '0 4px 10px rgba(99,102,241,0.15)', color: 'white', transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
-                    onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                    className="flex flex-col items-center gap-3.5 p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-all duration-300 rounded-2xl cursor-pointer text-slate-800 dark:text-slate-200 outline-none w-full"
                   >
-                    <span style={{ fontSize: '22px' }}>📲</span> Recibir dinero
+                    <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 flex items-center justify-center transition-transform duration-250 hover:scale-105">
+                      <ArrowDownToLine className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 mt-3">Recibir dinero</span>
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px' }}>
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+                  
                   {/* Resumen de Transferencias Recientes */}
-                  <div>
-                    <h3 style={{ fontFamily: 'Syne', fontSize: '18px', marginBottom: '14px' }}>Transferencias Recientes</h3>
-                    <div style={{ border: '1px solid ' + themeStyles.border, borderRadius: '12px', overflow: 'hidden' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <div className="lg:col-span-3">
+                    <h3 className="font-['Syne'] text-lg font-bold text-slate-900 dark:text-white mb-4">
+                      Transferencias Recientes
+                    </h3>
+                    <div className="overflow-x-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-2 shadow-sm">
+                      <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr style={{ background: theme === "dark" ? "#1e293b" : "#F8FAFC", borderBottom: '1px solid ' + themeStyles.border, textAlign: 'left' }}>
-                            <th style={{ padding: '10px 12px', color: themeStyles.textMuted }}>Destino / Origen</th>
-                            <th style={{ padding: '10px 12px', color: themeStyles.textMuted }}>Categoría</th>
-                            <th style={{ padding: '10px 12px', color: themeStyles.textMuted }}>Monto</th>
-                            <th style={{ padding: '10px 12px', color: themeStyles.textMuted }}>Fecha</th>
+                          <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800/80">
+                            <th className="px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider rounded-l-xl">
+                              Destino / Origen
+                            </th>
+                            <th className="px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                              Categoría
+                            </th>
+                            <th className="px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                              Monto
+                            </th>
+                            <th className="px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider rounded-r-xl">
+                              Fecha
+                            </th>
                           </tr>
                         </thead>
-                        <tbody>
-                          {transacciones.slice(0, 5).map((t, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid ' + (theme === "dark" ? "#334155" : "#F1F5F9") }}>
-                              <td style={{ padding: '10px 12px', fontWeight: 600 }}>{t.comercio}</td>
-                              <td style={{ padding: '10px 12px' }}>
-                                <span style={{ background: theme === "dark" ? "rgba(255,255,255,0.06)" : "#F1F5F9", color: themeStyles.text, padding: '2px 8px', borderRadius: '12px', fontSize: '11px' }}>
-                                  {t.categoria}
-                                </span>
-                              </td>
-                              <td style={{ padding: '10px 12px', fontWeight: 700, color: t.comercio?.includes('Recarga') ? '#10B981' : themeStyles.text }}>
-                                {t.comercio?.includes('Recarga') ? '+' : '-'}${t.monto?.toLocaleString()}
-                              </td>
-                              <td style={{ padding: '10px 12px', color: themeStyles.textMuted }}>{formatDate(t.fecha)}</td>
-                            </tr>
-                          ))}
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                          {transacciones.slice(0, 5).map((t, i) => {
+                            const isRecibido = t.comercio?.includes('Recarga') || t.comercio?.includes('Recibido') || t.tipo === 'recibir' || t.comercio?.toLowerCase().includes('recibo') || t.comercio?.toLowerCase().includes('recibido');
+                            return (
+                              <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors duration-150">
+                                <td className="px-4 py-3.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+                                  {t.comercio}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <span className="inline-block bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
+                                    {t.categoria}
+                                  </span>
+                                </td>
+                                <td className={`px-4 py-3.5 text-sm font-bold ${isRecibido ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
+                                  {isRecibido ? '+' : '-'}${t.monto?.toLocaleString()}
+                                </td>
+                                <td className="px-4 py-3.5 text-xs text-slate-700 dark:text-slate-300">
+                                  {formatDate(t.fecha)}
+                                </td>
+                              </tr>
+                            );
+                          })}
                           {transacciones.length === 0 && (
                             <tr>
-                              <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: themeStyles.textMuted }}>No tienes movimientos recientes</td>
+                              <td colSpan="4" className="px-4 py-8 text-center text-slate-400 dark:text-slate-500 text-xs font-semibold">
+                                No tienes movimientos recientes
+                              </td>
                             </tr>
                           )}
                         </tbody>
@@ -996,22 +1073,45 @@ export default function UsuarioDashboard() {
                   </div>
 
                   {/* Código QR único del Usuario */}
-                  <div style={{ 
-                    border: '1px solid ' + themeStyles.border, borderRadius: '16px', padding: '20px',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    background: theme === "dark" ? "#0f172a" : "#F8FAFC"
-                  }}>
-                    <h3 style={{ fontFamily: 'Syne', fontSize: '16px', margin: '0 0 12px', textAlign: 'center' }}>Mi Código QR</h3>
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(perfil?.llave || '')}`}
-                      alt="Código QR del usuario" 
-                      style={{ border: '4px solid #fff', borderRadius: '8px', width: '130px', height: '130px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}
-                    />
-                    <p style={{ fontSize: '11px', color: themeStyles.textMuted, textAlign: 'center', marginTop: '12px', lineHeight: 1.4 }}>
+                  <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-sm">
+                    <h3 className="font-['Syne'] text-base text-slate-800 dark:text-white font-bold mb-4">
+                      Mi Código QR
+                    </h3>
+                    
+                    {/* Contenedor blanco puro con padding */}
+                    <div className="bg-white p-3 rounded-xl border border-slate-100 dark:border-slate-700 mx-auto inline-block">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(perfil?.llave || '')}`}
+                        alt="Código QR del usuario" 
+                        className="w-32 h-32"
+                      />
+                    </div>
+                    
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-4 leading-relaxed max-w-[200px]">
                       Escanea este código QR único desde otro dispositivo para transferir dinero usando la llave.
                     </p>
-                    <div style={{ marginTop: '8px', background: theme === "dark" ? "#334155" : "#E2E8F0", color: themeStyles.text, padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>
-                      Llave: {perfil?.llave || "VT-000000"}
+                    
+                    <div className="mt-4 flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 pl-3.5 pr-2 py-1.5 rounded-full shadow-sm text-xs font-bold">
+                      <span>Llave:</span>
+                      <code className="font-mono text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-[11px]">
+                        {perfil?.llave || "VT-000000"}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(perfil?.llave || "");
+                          setCopiado(true);
+                          setTimeout(() => setCopiado(false), 2000);
+                        }}
+                        className="p-1 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-slate-800/80 cursor-pointer transition-colors duration-150 outline-none border-none bg-transparent flex items-center justify-center"
+                        title="Copiar Llave"
+                      >
+                        {copiado ? (
+                          <span className="text-[10px] text-blue-600 dark:text-blue-400 px-1">¡Copiado!</span>
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1416,125 +1516,292 @@ export default function UsuarioDashboard() {
 
             {/* ⚙️ SECCIÓN AJUSTES */}
             {seccion === 'ajustes' && (
-              <div>
-                <h1 style={{ fontFamily: "Syne", fontSize: "26px", marginBottom: "10px" }}>Ajustes de Perfil</h1>
-                <p style={{ color: themeStyles.textMuted, marginBottom: "20px" }}>Actualiza tus datos personales de seguridad</p>
-                
-                <form onSubmit={handleGuardarAjustes} style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '500px', marginTop: '20px' }}>
-                  {msgAjustes && (
-                    <div style={{
-                      padding: "10px 14px",
-                      borderRadius: "7px",
-                      background: "rgba(16,185,129,0.15)",
-                      border: "1px solid rgba(16,185,129,0.35)",
-                      color: "#34D399",
-                      fontSize: "13px",
-                    }}>
-                      {msgAjustes}
-                    </div>
-                  )}
-                  {errorAjustes && (
-                    <div style={{
-                      padding: "10px 14px",
-                      borderRadius: "7px",
-                      background: "rgba(220,38,38,0.15)",
-                      border: "1px solid rgba(220,38,38,0.35)",
-                      color: "#FCA5A5",
-                      fontSize: "13px",
-                    }}>
-                      {errorAjustes}
-                    </div>
-                  )}
+              <div className="flex flex-col gap-6 w-full">
+                {/* Encabezado */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 dark:border-slate-800/80 pb-5">
                   <div>
-                    <label style={{ fontSize: '12px', color: themeStyles.textMuted, fontWeight: 600, display: 'block', marginBottom: '6px' }}>Teléfono Celular</label>
-                    <input 
-                      className="input-field" 
-                      value={editTelefono} 
-                      onChange={e => setEditTelefono(e.target.value.replace(/\D/g, "").slice(0, 10))} 
-                      required
-                      style={{ background: themeStyles.cardBg, color: themeStyles.text, borderColor: themeStyles.border }} 
-                    />
+                    <h1 className="text-3xl font-black font-['Syne'] text-slate-900 dark:text-white leading-tight">
+                      Ajustes y Seguridad
+                    </h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Gestiona tu perfil, seguridad de tarjetas y preferencias.
+                    </p>
                   </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: themeStyles.textMuted, fontWeight: 600, display: 'block', marginBottom: '6px' }}>Nueva Contraseña (dejar vacío si no deseas cambiarla)</label>
-                    <div style={{ position: "relative", width: "100%" }}>
-                      <input 
-                        className="input-field" 
-                        type={verContrasena ? "text" : "password"}
-                        value={nuevaContrasena} 
-                        onChange={e => setNuevaContrasena(e.target.value)} 
-                        placeholder="Mínimo 6 caracteres"
-                        style={{ background: themeStyles.cardBg, color: themeStyles.text, borderColor: themeStyles.border, paddingRight: "40px", width: "100%" }} 
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setVerContrasena(!verContrasena)}
-                        style={{
-                          position: "absolute",
-                          right: "12px",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          background: "none",
-                          border: "none",
-                          color: themeStyles.textMuted,
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          padding: 0,
-                          outline: "none",
-                          transition: "color 0.2s",
-                          zIndex: 5,
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.color = theme === "dark" ? "#f8fafc" : "#1E293B"}
-                        onMouseLeave={e => e.currentTarget.style.color = themeStyles.textMuted}
-                      >
-                        {verContrasena ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                            <line x1="1" y1="1" x2="23" y2="23"></line>
-                          </svg>
-                        ) : (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                          </svg>
-                        )}
-                      </button>
-                    </div>
+                  <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border border-blue-100 dark:border-blue-800/40">
+                    ROL: {perfil?.rol?.toUpperCase() || "USER"}
                   </div>
-                  <button
-                    type="submit"
-                    disabled={guardandoAjustes}
-                    style={{
-                      background: '#06B6D4',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '10px 20px',
-                      cursor: guardandoAjustes ? 'not-allowed' : 'pointer',
-                      fontWeight: 600,
-                      fontSize: '13.5px',
-                      alignSelf: 'flex-start',
-                      transition: 'background 0.15s',
-                      opacity: guardandoAjustes ? 0.7 : 1,
-                    }}
-                    onMouseEnter={e => { if(!guardandoAjustes) e.target.style.background = '#0891B2'; }}
-                    onMouseLeave={e => { if(!guardandoAjustes) e.target.style.background = '#06B6D4'; }}
-                  >
-                    {guardandoAjustes ? (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                          <circle cx="12" cy="12" r="10" stroke="rgba(255, 255, 255, 0.2)" strokeDasharray="31.4" />
-                          <path d="M12 2a10 10 0 0 1 10 10" />
-                        </svg>
-                        <span>Guardando...</span>
+                </div>
+
+                {/* Contenedor Grid Principal */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start w-full">
+                  
+                  {/* Columna Izquierda: Sub-Menú Lateral */}
+                  <div className="md:col-span-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 shadow-sm flex flex-col gap-1.5">
+                    {[
+                      { id: 'perfil', name: 'Perfil', icon: User },
+                      { id: 'documentos', name: 'Documentos', icon: FileText },
+                      { id: 'seguridad', name: 'Seguridad', icon: Shield },
+                      { id: 'preferencias', name: 'Preferencias', icon: Sliders }
+                    ].map((opt) => {
+                      const Icon = opt.icon;
+                      const isActive = subTab === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setSubTab(opt.id)}
+                          className={`flex items-center gap-3 w-full px-4 py-3 text-xs font-bold transition-all duration-200 text-left cursor-pointer ${
+                            isActive
+                              ? "bg-blue-600 text-white rounded-xl shadow-md shadow-blue-600/10"
+                              : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white rounded-xl bg-transparent border-none"
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`} />
+                          <span>{opt.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Columna Derecha: Contenido de Sub-Tabs */}
+                  <div className="md:col-span-3 flex flex-col gap-6 w-full">
+                    
+                    {/* VISTA 1: PERFIL */}
+                    {subTab === 'perfil' && (
+                      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col gap-8">
+                        
+                        {/* Título de Sección */}
+                        <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+                          <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          <h2 className="text-lg font-bold text-slate-900 dark:text-white font-['Syne']">
+                            Datos de tu Perfil
+                          </h2>
+                        </div>
+
+                        {/* Sección Avatar */}
+                        <div className="flex flex-col sm:flex-row items-center gap-6">
+                          {/* Contenedor del Avatar */}
+                          <div className="relative">
+                            <div className="w-24 h-24 rounded-full bg-blue-50/15 dark:bg-blue-950/40 border-2 border-blue-200 dark:border-blue-800/50 flex items-center justify-center text-blue-600 dark:text-blue-400 text-3xl font-black shadow-inner">
+                              {(perfil?.nombre || currentUser?.email || "U")[0].toUpperCase()}
+                            </div>
+                            {/* Botón Upload superpuesto */}
+                            <button
+                              type="button"
+                              onClick={() => alert("Simulando carga de avatar...")}
+                              className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-md transition-colors duration-200 cursor-pointer"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Info a la derecha del Avatar */}
+                          <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-1">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              {perfil?.nombre || "Cargando usuario..."}
+                            </h3>
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                              <span className="font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px]">VittaCard ID:</span>
+                              <code className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-mono text-slate-600 dark:text-slate-300">
+                                {perfilId || currentUser?.uid?.slice(0, 10) || "N/A"}
+                              </code>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tarjeta de Datos (Info Box) */}
+                        <div className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border border-slate-100/40 dark:border-slate-800/20">
+                          <div>
+                            <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                              Nombre Completo
+                            </span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                              {perfil?.nombre || "No especificado"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                              Documento de Identidad
+                            </span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                              {perfil?.documento || "1.061.284.XXX"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                              Correo Electrónico
+                            </span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                              {currentUser?.email || perfil?.email || "No especificado"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                              Teléfono Celular
+                            </span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                              {perfil?.telefono || "No registrado"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Botón de Acción */}
+                        <div className="flex justify-end border-t border-slate-100 dark:border-slate-800/80 pt-6">
+                          <button
+                            type="button"
+                            onClick={() => alert("Solicitud de modificación enviada. El equipo de soporte se contactará contigo.")}
+                            className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-850 dark:hover:bg-slate-800 text-white text-xs font-bold px-5 py-3 rounded-xl shadow-sm transition-all duration-200 cursor-pointer border-none"
+                          >
+                            Solicitar Modificación de Datos
+                          </button>
+                        </div>
+
                       </div>
-                    ) : (
-                      "Guardar Ajustes"
                     )}
-                  </button>
-                </form>
+
+                    {/* VISTA 2: DOCUMENTOS */}
+                    {subTab === 'documentos' && (
+                      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col gap-6">
+                        <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+                          <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          <h2 className="text-lg font-bold text-slate-900 dark:text-white font-['Syne']">
+                            Documentación Vinculada
+                          </h2>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Visualiza y gestiona los documentos oficiales cargados para la verificación de tu cuenta de acuerdo con las normativas financieras.
+                        </p>
+                        
+                        <div className="border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-3 bg-slate-50/50 dark:bg-slate-950/20">
+                          <FileText className="w-10 h-10 text-slate-300 dark:text-slate-700" />
+                          <div>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Copia de Documento de Identidad (Frente & Dorso)</p>
+                            <p className="text-[11px] text-emerald-500 font-semibold mt-0.5">✓ Verificado y Aprobado</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* VISTA 3: SEGURIDAD (CON FORMULARIO REAL) */}
+                    {subTab === 'seguridad' && (
+                      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col gap-6">
+                        <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+                          <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          <h2 className="text-lg font-bold text-slate-900 dark:text-white font-['Syne']">
+                            Ajustes de Seguridad
+                          </h2>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Actualiza tu número telefónico celular de contacto o realiza un cambio en tu contraseña de ingreso.
+                        </p>
+
+                        <form onSubmit={handleGuardarAjustes} className="flex flex-col gap-5 max-w-lg mt-2">
+                          {msgAjustes && (
+                            <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                              {msgAjustes}
+                            </div>
+                          )}
+                          {errorAjustes && (
+                            <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 text-red-600 dark:text-red-400 text-xs font-semibold">
+                              {errorAjustes}
+                            </div>
+                          )}
+                          
+                          <div className="flex flex-col gap-2">
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                              Teléfono Celular
+                            </label>
+                            <input 
+                              type="text"
+                              className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" 
+                              value={editTelefono} 
+                              onChange={e => setEditTelefono(e.target.value.replace(/\D/g, "").slice(0, 10))} 
+                              required
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                              Nueva Contraseña (dejar vacío si no deseas cambiarla)
+                            </label>
+                            <div className="relative w-full">
+                              <input 
+                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 rounded-xl px-4 py-3 pr-10 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" 
+                                type={verContrasena ? "text" : "password"}
+                                value={nuevaContrasena} 
+                                onChange={e => setNuevaContrasena(e.target.value)} 
+                                placeholder="Mínimo 6 caracteres"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setVerContrasena(!verContrasena)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer bg-transparent border-none p-0 outline-none"
+                              >
+                                {verContrasena ? (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                  </svg>
+                                ) : (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={guardandoAjustes}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-3 rounded-xl shadow-md shadow-blue-600/10 cursor-pointer transition-all duration-200 disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 self-start border-none"
+                          >
+                            {guardandoAjustes ? (
+                              <>
+                                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                  <circle cx="12" cy="12" r="10" stroke="rgba(255, 255, 255, 0.2)" strokeDasharray="31.4" />
+                                  <path d="M12 2a10 10 0 0 1 10 10" />
+                                </svg>
+                                <span>Guardando...</span>
+                              </>
+                            ) : (
+                              "Guardar Ajustes"
+                            )}
+                          </button>
+                        </form>
+                      </div>
+                    )}
+
+                    {/* VISTA 4: PREFERENCIAS */}
+                    {subTab === 'preferencias' && (
+                      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col gap-6">
+                        <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+                          <Sliders className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          <h2 className="text-lg font-bold text-slate-900 dark:text-white font-['Syne']">
+                            Preferencias de Cuenta
+                          </h2>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Ajusta la configuración de notificaciones, canales de comunicación y visualización preferida.
+                        </p>
+                        
+                        <div className="flex flex-col gap-4">
+                          <label className="flex items-center gap-3 cursor-pointer select-none">
+                            <input type="checkbox" defaultChecked className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Recibir alertas de compras y transacciones por email</span>
+                          </label>
+                          <label className="flex items-center gap-3 cursor-pointer select-none">
+                            <input type="checkbox" defaultChecked className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Notificar promociones y ofertas exclusivas de aliados</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+
+                </div>
               </div>
             )}
           </div>

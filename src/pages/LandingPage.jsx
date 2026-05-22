@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
 import { collection, getDocs } from "firebase/firestore";
+import { Check } from "lucide-react";
+
 
 const DEFAULT_PLANES = [
   {
@@ -1131,15 +1133,12 @@ export default function LandingPage() {
       </div>
     </section>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          5. SECCIÓN PLANES
-      ════════════════════════════════════════════════════════════════════ */}
+      {/* 5. SECCIÓN PLANES */}
       <section id="planes" style={{
         background: modoOscuro ? "rgba(2, 12, 18, 0.75)" : "rgba(241, 245, 249, 0.85)",
         borderBottom: modoOscuro ? "1px solid rgba(20, 184, 166, 0.15)" : "1px solid rgba(226, 232, 240, 0.8)",
       }}>
         <div className="section-container">
-          
           <div className="reveal" style={{ textAlign: "center", maxWidth: "640px", margin: "0 auto 56px auto" }}>
             <span style={estiloLabelSeccion(c.tealBg, c.tealText, c.tealBorde)}>
               Planes
@@ -1152,124 +1151,59 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid-4-col" style={{ alignItems: "stretch" }}>
-            {planes.map((plan) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
+            {[...planes].sort((a, b) => (a.cuota || 0) - (b.cuota || 0)).map((plan) => {
               const esPremium = plan.id === "premium";
+              const esPlus = plan.id === "plus";
+              const esBasico = plan.id === "basico";
               const esFree = plan.id === "free";
               
-              // Estilos de tarjeta dinámicos
-              const cardStyles = esPremium 
-                ? {
-                    ...estiloCard,
-                    justifyContent: "space-between",
-                    background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 50%, #4338CA 100%)",
-                    border: "1px solid rgba(255, 255, 255, 0.25)",
-                    color: "#ffffff",
-                    position: "relative",
-                    transform: "scale(1.01)",
-                    boxShadow: "0 15px 40px rgba(124, 58, 237, 0.35)",
-                  }
-                : { ...estiloCard, justifyContent: "space-between" };
-
-              // Clases dinámicas
-              const cardClassName = esPremium ? "reveal hover-card-lifestyle" : "reveal hover-card";
-
-              // Estilos de botón dinámicos
-              let btnStyles = { ...s.btnPrimary, width: "100%", padding: "12px 20px" };
-              let btnClassName = "btn-hover";
-
-              if (esPremium) {
-                btnStyles = {
-                  ...btnStyles,
-                  background: "#ffffff",
-                  color: "#7C3AED",
-                  boxShadow: "0 10px 25px rgba(255,255,255,0.2)",
-                };
-                btnClassName = "btn-hover-white";
-              } else if (esFree) {
-                btnStyles = {
-                  ...btnStyles,
-                  background: modoOscuro ? "rgba(255,255,255,0.08)" : "#64748B",
-                  border: modoOscuro ? "1px solid rgba(255,255,255,0.15)" : "none",
-                  color: "#ffffff",
-                  boxShadow: "none",
-                };
-                btnClassName = "btn-hover-ghost";
-              } else {
-                btnStyles = {
-                  ...btnStyles,
-                  background: plan.color || "#00B4B4",
-                };
-              }
-
-              // Color del checkmark
-              const checkColor = esPremium ? "#ffffff" : (plan.color || "#14B8A6");
-
               return (
                 <div 
                   key={plan.id}
-                  style={cardStyles}
-                  className={cardClassName}
+                  className={`reveal flex flex-col justify-between p-8 rounded-2xl relative transition-all duration-300 hover:-translate-y-2 ${
+                    esPremium 
+                      ? "bg-gradient-to-b from-purple-600 to-indigo-800 text-white shadow-xl shadow-purple-600/20 border border-purple-500/30" 
+                      : "bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white shadow-sm hover:shadow-md"
+                  }`}
                 >
                   {esPremium && (
-                    /* Badge */
-                    <div style={{
-                      position: "absolute",
-                      top: 0,
-                      right: "50%",
-                      transform: "translate(50%, -50%)",
-                      background: "#f59e0b",
-                      border: "1px solid rgba(255,255,255,0.25)",
-                      borderRadius: "20px",
-                      padding: "4px 14px",
-                      fontSize: "9px",
-                      fontWeight: 800,
-                      letterSpacing: "1px",
-                      textTransform: "uppercase",
-                      boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
-                    }}>
-                      {plan.subtitulo?.toUpperCase() || "RECOMENDADO"}
+                    <div className="absolute -top-3 right-6 bg-yellow-400 text-slate-900 text-[10px] font-extrabold px-3.5 py-1 rounded-full uppercase tracking-wider shadow-md">
+                      RECOMENDADO
                     </div>
                   )}
 
                   <div>
-                    <p style={{ 
-                      fontSize: "11px", 
-                      fontWeight: 700, 
-                      textTransform: "uppercase", 
-                      letterSpacing: "1px", 
-                      color: esPremium ? "rgba(255,255,255,0.75)" : c.textoSub, 
-                      marginBottom: "8px",
-                      marginTop: esPremium ? "4px" : "0px"
-                    }}>
-                      {plan.subtitulo}
+                    <p className={`text-[10px] font-extrabold uppercase tracking-wider mb-2 ${
+                      esPremium ? "text-purple-200" : "text-slate-500 dark:text-slate-400"
+                    }`}>
+                      {plan.subtitulo || (esFree ? "Básico" : esBasico ? "Esencial" : esPlus ? "Avanzado" : "Recomendado")}
                     </p>
-                    <h3 style={{ 
-                      fontSize: "24px", 
-                      fontWeight: 800, 
-                      color: esPremium ? "#ffffff" : (plan.color || "#64748B"), 
-                      marginBottom: "16px", 
-                      fontFamily: "Syne" 
-                    }}>
+
+                    <h3 className={`text-2xl font-black mb-4 font-['Syne'] ${
+                      esPremium ? "text-white" : esFree ? "text-slate-600 dark:text-slate-400" : esBasico ? "text-blue-500" : "text-blue-600"
+                    }`}>
                       {plan.nombre}
                     </h3>
                     
-                    <div style={{ display: "flex", alignItems: "baseline", marginBottom: "24px" }}>
-                      <span style={{ fontSize: "36px", fontWeight: 800 }}>
+                    <div className="flex items-baseline mb-6">
+                      <span className="text-4xl font-extrabold tracking-tight">
                         ${plan.cuota === 0 ? "0" : plan.cuota?.toLocaleString()}
                       </span>
-                      <span style={{ 
-                        fontSize: "12px", 
-                        color: esPremium ? "rgba(255,255,255,0.75)" : c.textoSub, 
-                        marginLeft: "4px" 
-                      }}>/mes</span>
+                      <span className={`text-xs ml-1 font-semibold ${
+                        esPremium ? "text-purple-200" : "text-slate-500 dark:text-slate-400"
+                      }`}>/mes</span>
                     </div>
 
-                    <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px 0", display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <ul className="space-y-3 mb-8">
                       {(plan.beneficios || []).map((beneficio, i) => (
-                        <li key={i} style={{ display: "flex", gap: "10px", fontSize: "12px", alignItems: "flex-start" }}>
-                          <span style={{ color: checkColor, fontWeight: 800 }}>✓</span>
-                          <span>{beneficio}</span>
+                        <li key={i} className="flex items-start gap-2.5 text-xs">
+                          <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                            esPremium ? "text-yellow-400" : "text-blue-600 dark:text-blue-400"
+                          }`} />
+                          <span className={esPremium ? "text-purple-50" : "text-slate-600 dark:text-slate-300"}>
+                            {beneficio}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -1277,10 +1211,17 @@ export default function LandingPage() {
 
                   <button
                     onClick={() => irALogin(true, "usuario")}
-                    style={btnStyles}
-                    className={btnClassName}
+                    className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all duration-200 text-center ${
+                      esPremium
+                        ? "bg-yellow-400 text-slate-900 hover:bg-yellow-500 shadow-md shadow-yellow-400/20"
+                        : esFree
+                          ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                          : esBasico
+                            ? "bg-blue-500 hover:bg-blue-600 text-white shadow-sm"
+                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                    }`}
                   >
-                    {esFree ? "Comenzar Gratis" : `Comenzar con ${plan.nombre}`}
+                    {esPremium ? "Obtener Premium" : esFree ? "Crear Cuenta Gratis" : `Obtener ${plan.nombre}`}
                   </button>
                 </div>
               );
@@ -1603,38 +1544,207 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════════════════
           8. FOOTER (PIE DE PÁGINA)
       ════════════════════════════════════════════════════════════════════ */}
-      <footer style={{
-        padding: "48px 24px",
-        borderTop: `1px solid ${c.cardBorde}`,
-        background: "transparent",
-        transition: "all 0.3s",
-      }}>
-        <div className="footer-container">
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "20px" }}>💳</span>
-            <span style={{
-              fontWeight: 800,
-              fontSize: "16px",
-              fontFamily: "Syne",
-              background: "linear-gradient(90deg, #00F5D4, #00BBF9)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}>
-              VittaCard
-            </span>
+      <footer className="bg-[#0a1128] text-slate-400 py-16 border-t border-slate-800/60 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
+            {/* Columna 1: Marca */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">💳</span>
+                <span className="font-extrabold text-lg font-['Syne'] bg-gradient-to-r from-teal-400 to-blue-400 bg-clip-text text-transparent">
+                  VittaCard
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-400">
+                La plataforma inteligente de bienestar que conecta usuarios y comercios aliados en tiempo real. Simplifica tu salud y maximiza tus ahorros.
+              </p>
+            </div>
+
+            {/* Columna 2: Conócenos */}
+            <div className="flex flex-col gap-4">
+              <h4 className="text-white text-xs font-bold uppercase tracking-wider">
+                Conócenos
+              </h4>
+              <ul className="flex flex-col gap-2.5 text-xs">
+                <li>
+                  <a href="#hero" className="hover:text-white transition-colors duration-200">
+                    Inicio
+                  </a>
+                </li>
+                <li>
+                  <a href="#proceso" className="hover:text-white transition-colors duration-200">
+                    Cómo Funciona
+                  </a>
+                </li>
+                <li>
+                  <a href="#planes" className="hover:text-white transition-colors duration-200">
+                    Planes
+                  </a>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => setModalEquipo(true)}
+                    className="hover:text-white transition-colors duration-200 text-left cursor-pointer bg-transparent border-none p-0"
+                  >
+                    Equipo de Desarrollo
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Columna 3: Para Usuarios */}
+            <div className="flex flex-col gap-4">
+              <h4 className="text-white text-xs font-bold uppercase tracking-wider">
+                Para Usuarios
+              </h4>
+              <ul className="flex flex-col gap-2.5 text-xs">
+                <li>
+                  <a 
+                    href="#planes" 
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Membresías
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); irALogin(true, "usuario"); }}
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Registro Usuario
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); irALogin(false, "usuario"); }}
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Iniciar Sesión
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#contacto" 
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Soporte Usuario
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Columna 4: Para Comercios */}
+            <div className="flex flex-col gap-4">
+              <h4 className="text-white text-xs font-bold uppercase tracking-wider">
+                Para Comercios
+              </h4>
+              <ul className="flex flex-col gap-2.5 text-xs">
+                <li>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); irALogin(false, "aliado"); }}
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Portal Aliados
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); irALogin(true, "aliado"); }}
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Registro Comercio
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#roles" 
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Beneficios Aliados
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); irALogin(false, "aliado"); }}
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Validar Código QR
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Columna 5: Legal y Seguridad */}
+            <div className="flex flex-col gap-4">
+              <h4 className="text-white text-xs font-bold uppercase tracking-wider">
+                Legal y Seguridad
+              </h4>
+              <ul className="flex flex-col gap-2.5 text-xs">
+                <li>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); irALogin(false, "usuario"); }}
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Términos de Servicio
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); irALogin(false, "usuario"); }}
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Política de Privacidad
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); irALogin(false, "usuario"); }}
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Seguridad de Datos
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#contacto" 
+                    className="hover:text-white transition-colors duration-200"
+                  >
+                    Contacto Directo
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          {/* Copy */}
-          <p style={{ fontSize: "12px", color: c.textoSub, margin: 0, textAlign: "center" }}>
-            © 2026 · Fundación Universitaria de Popayán · Ingeniería de Software
-          </p>
+          {/* Divisor */}
+          <div className="border-t border-slate-800/80 my-8"></div>
 
-          {/* Enlaces de Interés */}
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", fontSize: "12px", fontWeight: 600 }}>
-            <a href="#hero" style={{ color: "#00B4B4", textDecoration: "none" }}>Volver arriba</a>
-            <span style={{ color: c.cardBorde }}>|</span>
-            <a href="#contacto" style={{ color: "#00B4B4", textDecoration: "none" }}>Soporte</a>
+          {/* Subfooter */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs">
+            <p className="text-slate-500">
+              © 2026 VittaCard · FUP. Popayán, Colombia. Todos los derechos reservados.
+            </p>
+            <div className="flex items-center gap-4">
+              <a href="#" className="text-slate-500 hover:text-white transition-colors duration-200">
+                Instagram
+              </a>
+              <span className="text-slate-800">|</span>
+              <a href="#" className="text-slate-500 hover:text-white transition-colors duration-200">
+                Facebook
+              </a>
+              <span className="text-slate-800">|</span>
+              <a href="#" className="text-slate-500 hover:text-white transition-colors duration-200">
+                LinkedIn
+              </a>
+            </div>
           </div>
         </div>
       </footer>

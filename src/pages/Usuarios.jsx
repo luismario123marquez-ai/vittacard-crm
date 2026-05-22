@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { db } from "../firebase/config";
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { db, auth } from "../firebase/config";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where } from "firebase/firestore";
 
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([]);
@@ -24,6 +24,21 @@ export default function Usuarios() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (editId) {
+      // Safeguard: block auto-suspension or self plan editing
+      const userToEdit = usuarios.find(u => u.id === editId);
+      const isSelf = editId === auth.currentUser?.uid || 
+                     userToEdit?.uid === auth.currentUser?.uid || 
+                     form.correo === auth.currentUser?.email;
+      if (isSelf) {
+        const snap = await getDocs(query(collection(db, "usuarios"), where("correo", "==", form.correo)));
+        if (!snap.empty) {
+          const currentData = snap.docs[0].data();
+          if (form.activo !== currentData.activo || form.planId !== currentData.planId) {
+            alert("No puedes auto-suspenderte o cambiar tu propio plan por motivos de seguridad.");
+            return;
+          }
+        }
+      }
       await updateDoc(doc(db, "usuarios", editId), form);
     } else {
       await addDoc(collection(db, "usuarios"), { ...form, creadoEn: new Date() });
@@ -53,6 +68,12 @@ export default function Usuarios() {
   const filtered = usuarios.filter(u =>
     u.nombres?.toLowerCase().includes(search.toLowerCase()) ||
     u.correo?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const isFormSelf = editId && (
+    editId === auth.currentUser?.uid ||
+    form.correo === auth.currentUser?.email ||
+    usuarios.find(u => u.id === editId)?.uid === auth.currentUser?.uid
   );
 
   return (
@@ -106,7 +127,12 @@ export default function Usuarios() {
               </div>
               <div>
                 <label style={{ fontSize: "13px", fontWeight: 600, display: "block", marginBottom: "5px" }}>Plan</label>
-                <select className="input-field" value={form.planId} onChange={e => setForm({ ...form, planId: e.target.value })}>
+                <select 
+                  className="input-field" 
+                  value={form.planId} 
+                  onChange={e => setForm({ ...form, planId: e.target.value })}
+                  disabled={isFormSelf}
+                >
                   <option value="free">Free</option>
                   <option value="basico">Básico</option>
                   <option value="plus">Plus</option>
@@ -114,9 +140,20 @@ export default function Usuarios() {
                 </select>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <input type="checkbox" checked={form.activo} onChange={e => setForm({ ...form, activo: e.target.checked })} id="activo" />
+                <input 
+                  type="checkbox" 
+                  checked={form.activo} 
+                  onChange={e => setForm({ ...form, activo: e.target.checked })} 
+                  id="activo" 
+                  disabled={isFormSelf}
+                />
                 <label htmlFor="activo" style={{ fontSize: "13px", fontWeight: 600 }}>Usuario activo</label>
               </div>
+              {isFormSelf && (
+                <p style={{ fontSize: "11px", color: "#DC2626", margin: "4px 0 0 0", fontWeight: 600 }}>
+                  * Por seguridad, no puedes cambiar tu propio plan ni suspender tu cuenta.
+                </p>
+              )}
               <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                 <button type="submit" className="btn-primary">
                   {editId ? "Guardar cambios" : "Crear usuario"}
@@ -144,54 +181,79 @@ export default function Usuarios() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(u => (
-              <tr key={u.id} style={{ borderBottom: "1px solid #F9FAFB" }}>
-                <td style={{ padding: "14px", fontWeight: 600, fontSize: "14px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <div style={{
-                      width: "34px", height: "34px", borderRadius: "50%",
-                      background: "#E0F7F7", display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "14px", fontWeight: 700, color: "#00B4B4"
-                    }}>
-                      {u.nombres?.[0] || "?"}
+            {filtered.map(u => {
+              const isSelf = u.id === auth.currentUser?.uid || u.uid === auth.currentUser?.uid || u.correo === auth.currentUser?.email;
+              return (
+                <tr key={u.id} style={{ borderBottom: "1px solid #F9FAFB" }}>
+                  <td style={{ padding: "14px", fontWeight: 600, fontSize: "14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{
+                        width: "34px", height: "34px", borderRadius: "50%",
+                        background: "#E0F7F7", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "14px", fontWeight: 700, color: "#00B4B4"
+                      }}>
+                        {u.nombres?.[0] || "?"}
+                      </div>
+                      {u.nombres}
                     </div>
-                    {u.nombres}
-                  </div>
-                </td>
-                <td style={{ padding: "14px", fontSize: "13px", color: "#6B7280" }}>{u.correo}</td>
-                <td style={{ padding: "14px", fontSize: "12px", fontFamily: "monospace", color: "#374151" }}>{u.cuenta || "—"}</td>
-                <td style={{ padding: "14px" }}>
-                  <span style={{
-                    background: (planColor[u.planId] || "#ccc") + "20",
-                    color: planColor[u.planId] || "#ccc",
-                    padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700
-                  }}>
-                    {planLabel(u.planId)}
-                  </span>
-                </td>
-                <td style={{ padding: "14px" }}>
-                  <span style={{
-                    background: u.activo ? "#D1FAE5" : "#FEE2E2",
-                    color: u.activo ? "#059669" : "#DC2626",
-                    padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700
-                  }}>
-                    {u.activo ? "✓ Activo" : "✗ Inactivo"}
-                  </span>
-                </td>
-                <td style={{ padding: "14px" }}>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={() => handleEdit(u)} style={{
-                      padding: "6px 12px", borderRadius: "8px", border: "none",
-                      background: "#E0F7F7", color: "#008A8A", cursor: "pointer", fontSize: "12px", fontWeight: 600
-                    }}>Editar</button>
-                    <button onClick={() => handleDelete(u.id)} style={{
-                      padding: "6px 12px", borderRadius: "8px", border: "none",
-                      background: "#FEE2E2", color: "#DC2626", cursor: "pointer", fontSize: "12px", fontWeight: 600
-                    }}>Eliminar</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td style={{ padding: "14px", fontSize: "13px", color: "#6B7280" }}>{u.correo}</td>
+                  <td style={{ padding: "14px", fontSize: "12px", fontFamily: "monospace", color: "#374151" }}>{u.cuenta || "—"}</td>
+                  <td style={{ padding: "14px" }}>
+                    <span style={{
+                      background: (planColor[u.planId] || "#ccc") + "20",
+                      color: planColor[u.planId] || "#ccc",
+                      padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700
+                    }}>
+                      {planLabel(u.planId)}
+                    </span>
+                  </td>
+                  <td style={{ padding: "14px" }}>
+                    <span style={{
+                      background: u.activo ? "#D1FAE5" : "#FEE2E2",
+                      color: u.activo ? "#059669" : "#DC2626",
+                      padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700
+                    }}>
+                      {u.activo ? "✓ Activo" : "✗ Inactivo"}
+                    </span>
+                  </td>
+                  <td style={{ padding: "14px" }}>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button 
+                        disabled={isSelf} 
+                        onClick={() => handleEdit(u)} 
+                        style={{
+                          padding: "6px 12px", borderRadius: "8px", border: "none",
+                          background: isSelf ? "#F3F4F6" : "#E0F7F7", 
+                          color: isSelf ? "#9CA3AF" : "#008A8A", 
+                          cursor: isSelf ? "not-allowed" : "pointer", 
+                          fontSize: "12px", 
+                          fontWeight: 600
+                        }}
+                        title={isSelf ? "No puedes auto-editarte o suspenderte" : ""}
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        disabled={isSelf} 
+                        onClick={() => handleDelete(u.id)} 
+                        style={{
+                          padding: "6px 12px", borderRadius: "8px", border: "none",
+                          background: isSelf ? "#F3F4F6" : "#FEE2E2", 
+                          color: isSelf ? "#9CA3AF" : "#DC2626", 
+                          cursor: isSelf ? "not-allowed" : "pointer", 
+                          fontSize: "12px", 
+                          fontWeight: 600
+                        }}
+                        title={isSelf ? "No puedes auto-editarte o suspenderte" : ""}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {filtered.length === 0 && (
